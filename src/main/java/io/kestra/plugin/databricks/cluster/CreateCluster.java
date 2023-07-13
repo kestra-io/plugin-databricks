@@ -1,6 +1,6 @@
 package io.kestra.plugin.databricks.cluster;
 
-import com.databricks.sdk.service.compute.ClusterSource;
+import com.databricks.sdk.service.compute.AutoScale;
 import com.databricks.sdk.service.compute.State;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -8,6 +8,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -26,10 +27,12 @@ import javax.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
+            title = "Create a Databricks cluster with one worker",
             code = """
                 id: createCluster
                 type: io.kestra.plugin.databricks.cluster.CreateCluster
-                token: <your-token>
+                authentication:
+                  token: <your-token>
                 host: <your-host>
                 clusterName: kestra-demo
                 nodeTypeId: n2-highmem-4
@@ -39,23 +42,46 @@ import javax.validation.constraints.NotNull;
         )
     }
 )
+@Schema(title = "Create a Databricks cluster")
 public class CreateCluster extends AbstractTask implements RunnableTask<CreateCluster.Output> {
     @NotNull
     @PluginProperty(dynamic = true)
+    @Schema(title = "The name of the cluster")
     private String clusterName;
 
     @NotNull
     @PluginProperty
+    @Schema(title = "The Spark version")
     private String sparkVersion;
 
     @PluginProperty
+    @Schema(title = "The type of node, the value depends on th cloud provider")
     private String nodeTypeId;
 
     @PluginProperty
+    @Schema(title = "If set, the cluster will be terminated automatically after this delay")
     private Long autoTerminationMinutes;
 
     @PluginProperty
+    @Schema(
+        title = "The fixed number of workers",
+        description = "You must set this property if you're not using autoscaling thanks to the `minWorkers` and `maxWorkers` property."
+    )
     private Long numWorkers;
+
+    @PluginProperty
+    @Schema(
+        title = "The minimum number of workers",
+        description = "Use this property along with `maxWorkers` to use autoscaling. Otherwise, use `numWorkers to use a fixed number of workers."
+    )
+    private Long minWorkers;
+
+    @PluginProperty
+    @Schema(
+        title = "The maximum number of workers",
+        description = "Use this property along with `minWorkers` to use autoscaling. Otherwise, use `numWorkers to use a fixed number of workers."
+    )
+    private Long maxWorkers;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
@@ -65,9 +91,12 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
                 .setNodeTypeId(nodeTypeId)
                 .setAutoterminationMinutes(autoTerminationMinutes)
                 .setNumWorkers(numWorkers);
+        if (minWorkers != null && maxWorkers != null) {
+            createCluster.setAutoscale(new AutoScale().setMinWorkers(minWorkers).setMaxWorkers(maxWorkers));
+        }
 
         var workspaceClient = workspaceClient(runContext);
-        var response = workspaceClient.clusters().create(createCluster).get(); //TODO timeout
+        var response = workspaceClient.clusters().create(createCluster).get();
         var clusterURI = URI.create(workspaceClient.config().getHost() + "/#setting/clusters/" + response.getClusterId() + "/configuration");
         runContext.logger().info("Cluster created: {}", clusterURI);
 
@@ -81,10 +110,13 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "The cluster identifier")
         private String clusterId;
 
+        @Schema(title = "The cluster URI on the Databricks console")
         private URI clusterURI;
 
+        @Schema(title = "The cluster state")
         private State clusterState;
     }
 }

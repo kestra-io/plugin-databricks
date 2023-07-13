@@ -7,6 +7,7 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,19 +24,23 @@ import javax.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
+            title = "Delete a Databricks cluster",
             code = """
                 id: deleteCluster
                 type: io.kestra.plugin.databricks.cluster.DeleteCluster
-                token: <your-token>
+                authentication:
+                  token: <your-token>
                 host: <your-host>
                 clusterId: <your-cluster>
                 """
         )
     }
 )
+@Schema(title = "Delete a Databricks cluster")
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
-    @PluginProperty(dynamic = true)
     @NotNull
+    @PluginProperty(dynamic = true)
+    @Schema(title = "The cluster identifier")
     private String clusterId;
 
     @Override
@@ -43,7 +48,7 @@ public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutp
         var deleteCluster = new com.databricks.sdk.service.compute.DeleteCluster()
             .setClusterId(runContext.render(clusterId));
 
-        workspaceClient(runContext).clusters().delete(deleteCluster).get(); //TODO timeout
+        workspaceClient(runContext).clusters().delete(deleteCluster).get();
 
         return null;
     }

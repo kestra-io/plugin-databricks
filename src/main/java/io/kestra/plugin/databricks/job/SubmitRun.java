@@ -1,6 +1,7 @@
 package io.kestra.plugin.databricks.job;
 
 import com.databricks.sdk.service.jobs.RunSubmitTaskSettings;
+import com.databricks.sdk.service.jobs.TaskDependenciesItem;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -13,6 +14,8 @@ import io.kestra.plugin.databricks.job.task.PythonWheelTaskSetting;
 import io.kestra.plugin.databricks.job.task.SparkJarTaskSetting;
 import io.kestra.plugin.databricks.job.task.SparkPythonTaskSetting;
 import io.kestra.plugin.databricks.job.task.SparkSubmitTaskSetting;
+import io.kestra.plugin.databricks.utils.TaskUtils;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -35,46 +38,53 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 @Plugin(examples = {
     @Example(
+        title = "Submit a Databricks run and wait 5mn for completion",
         code = """
             id: submitRun
             type: io.kestra.plugin.databricks.job.SubmitRun
-                token: <your-token>
-                host: <your-host>
-            runSubmitTaskSettings:
+            authentication:
+              token: <your-token>
+            host: <your-host>
+            runSTasks:
               - existingClusterId: <your-cluster>
                 taskKey: taskKey
-                sparkPythonTaskSetting:
+                sparkPythonTask:
                   pythonFile: /Shared/hello.py
                   sparkPythonTaskSource: WORKSPACE
-            waitRunTerminatedOrSkipped: PT5M
+            waitForCompletion: PT5M
             """
     )
 })
+@Schema(title = "Submit a Databricks run, use `waitForCompletion` if you want the task to wait for the run to complete")
 public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @PluginProperty(dynamic = true)
+    @Schema(title = "The name of the run")
     private String runName;
 
     @PluginProperty
-    private Duration waitRunTerminatedOrSkipped;
+    @Schema(title = "If set, the task will wait for the run completion")
+    private Duration waitForCompletion;
 
     @NotNull
     @NotEmpty
     @PluginProperty
-    private List<RunSubmitTaskSetting> runSubmitTaskSettings;
+    @Schema(title = "The run tasks, if multiple tasks are defined you must set `dependsOn` on each task")
+    private List<RunSubmitTaskSetting> runTasks;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        List<RunSubmitTaskSettings> tasks = runSubmitTaskSettings.stream().map(throwFunction(setting ->
+        List<RunSubmitTaskSettings> tasks = runTasks.stream().map(throwFunction(setting ->
             new RunSubmitTaskSettings()
                 .setExistingClusterId(runContext.render(setting.existingClusterId))
                 .setTaskKey(runContext.render(setting.taskKey))
                 .setTimeoutSeconds(setting.timeoutSeconds)
-                .setNotebookTask(setting.notebookTaskSetting != null ? setting.notebookTaskSetting.toNotebookTask(runContext) : null)
-                .setPipelineTask(setting.pipelineTaskSetting != null ? setting.pipelineTaskSetting.toPipelineTask(runContext) : null)
-                .setSparkJarTask(setting.sparkJarTaskSetting != null ? setting.sparkJarTaskSetting.toSparkJarTask(runContext) : null)
-                .setSparkSubmitTask(setting.sparkSubmitTaskSetting != null ? setting.sparkSubmitTaskSetting.toSparkSubmitTask(runContext) : null)
-                .setSparkPythonTask(setting.sparkPythonTaskSetting != null ? setting.sparkPythonTaskSetting.toSparkPythonTask(runContext) : null)
-                .setPythonWheelTask(setting.pythonWheelTaskSetting != null ? setting.pythonWheelTaskSetting.toPythonWheelTask(runContext) : null)))
+                .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
+                .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
+                .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
+                .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
+                .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
+                .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
+                .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))))
             .toList();
 
         var workspaceClient = workspaceClient(runContext);
@@ -88,9 +98,9 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         var runURI = URI.create(workspaceClient.config().getHost() + "/#job/" + run.getJobId() + "/run/" + run.getRunId());
         runContext.logger().info("Run submitted: {}", runURI);
 
-        if (waitRunTerminatedOrSkipped != null) {
-            runContext.logger().info("Waiting for run to be terminated or skipped for {}", waitRunTerminatedOrSkipped);
-            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(response.getRunId(), waitRunTerminatedOrSkipped, null);
+        if (waitForCompletion != null) {
+            runContext.logger().info("Waiting for run to be terminated or skipped for {}", waitForCompletion);
+            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(response.getRunId(), waitForCompletion, null);
             //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
 //            runContext.logger().info(workspaceClient.jobs().getRunOutput(response.getRunId()).getLogs());
             //TODO when finished, we have a lot of info that we can send as outputs and metrics
@@ -111,28 +121,41 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         private Long timeoutSeconds;
 
         @PluginProperty
-        private NotebookTaskSetting notebookTaskSetting;
+        @Schema(title = "Notebook task settings")
+        private NotebookTaskSetting notebookTask;
 
         @PluginProperty
-        private SparkSubmitTaskSetting sparkSubmitTaskSetting;
+        @Schema(title = "Spark Submit task settings")
+        private SparkSubmitTaskSetting sparkSubmitTask;
 
         @PluginProperty
-        private SparkJarTaskSetting sparkJarTaskSetting;
+        @Schema(title = "Spark JAR task settings")
+        private SparkJarTaskSetting sparkJarTask;
 
         @PluginProperty
-        private SparkPythonTaskSetting sparkPythonTaskSetting;
+        @Schema(title = "Spark Python task settings")
+        private SparkPythonTaskSetting sparkPythonTask;
 
         @PluginProperty
-        private PythonWheelTaskSetting pythonWheelTaskSetting;
+        @Schema(title = "Python Wheel task settings")
+        private PythonWheelTaskSetting pythonWheelTask;
 
         @PluginProperty
-        private PipelineTaskSetting pipelineTaskSetting;
+        @Schema(title = "Pipeline task settings")
+        private PipelineTaskSetting pipelineTask;
+
+        @PluginProperty
+        @Schema(title = "Task dependencies, set this if multiple tasks are defined on the run")
+        private List<String> dependsOn;
     }
 
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "The run identifier")
         private Long runId;
+
+        @Schema(title = "The run URI on the Databricks console")
         private URI runURI;
     }
 }

@@ -37,7 +37,7 @@ import java.util.function.Consumer;
 import javax.validation.constraints.NotNull;
 
 /**
- * See https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver
+ * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
  *
  * FIXME some part are copied from the plugin-jdbc, maybe we need to find a way to avoid copying and share more stuff
  */
@@ -63,15 +63,24 @@ import javax.validation.constraints.NotNull;
         @Metric(name = "fetch.size", type = "counter", description = "Query result size")
     }
 )
+@Schema(
+    title = "Execute an SQL query on a Databricks cluster",
+    description = """
+        See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
+        We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
+        """
+)
 public class Query extends Task implements RunnableTask<Query.Output> {
     private static final ObjectMapper MAPPER = JacksonMapper.ofIon();
 
     @NotNull
     @PluginProperty(dynamic = true)
+    @Schema(title = "Databricks host")
     private String host;
 
     @NotNull
     @PluginProperty(dynamic = true)
+    @Schema(title = "Databricks cluster HTTP Path")
     private String httpPath;
 
     @PluginProperty(dynamic = true)
@@ -81,6 +90,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     private String schema;
 
     @PluginProperty(dynamic = true)
+    @Schema(title = "Databricks access token")
     private String accessToken;
 
     @PluginProperty
@@ -88,6 +98,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @NotNull
     @PluginProperty(dynamic = true)
+    @Schema(title = "SQL query")
     private String sql;
 
     @Schema(
@@ -204,14 +215,12 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The url of the result file on kestra storage (.ion file / Amazon Ion text format)",
-            description = "Only populated if 'store' is set to true."
+            title = "The url of the result file on kestra storage (.ion file / Amazon Ion text format)"
         )
         private final URI uri;
 
         @Schema(
-            title = "The size of the fetched rows",
-            description = "Only populated if 'store' or 'fetch' parameter is set to true."
+            title = "The size of the fetched rows"
         )
         private final Long size;
     }
