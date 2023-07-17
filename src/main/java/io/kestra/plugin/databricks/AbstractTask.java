@@ -42,7 +42,7 @@ public abstract class AbstractTask extends Task {
         description = """
             This property allows to configure the authentication to Databricks, different properties should be set depending on the type of authentication and the cloud provider.
             All configuration options can also be set using the standard Databricks environment variables.
-            You can read the [Databricks authentication guide](https://docs.databricks.com/dev-tools/auth.html) for more information.
+            Check the [Databricks authentication guide](https://docs.databricks.com/dev-tools/auth.html) for more information.
             """
     )
     private AuthenticationConfig authentication;

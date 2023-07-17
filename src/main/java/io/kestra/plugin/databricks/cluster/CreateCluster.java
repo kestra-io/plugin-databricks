@@ -37,8 +37,7 @@ import javax.validation.constraints.NotNull;
                 clusterName: kestra-demo
                 nodeTypeId: n2-highmem-4
                 numWorkers: 1
-                sparkVersion: 13.0.x-scala2.12
-                """
+                sparkVersion: 13.0.x-scala2.12"""
         )
     }
 )
@@ -55,31 +54,31 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     private String sparkVersion;
 
     @PluginProperty
-    @Schema(title = "The type of node, the value depends on th cloud provider")
+    @Schema(title = "The type of node, the value depends on the cloud provider")
     private String nodeTypeId;
 
     @PluginProperty
-    @Schema(title = "If set, the cluster will be terminated automatically after this delay")
+    @Schema(title = "If set, the cluster will be terminated automatically after this time period")
     private Long autoTerminationMinutes;
 
     @PluginProperty
     @Schema(
         title = "The fixed number of workers",
-        description = "You must set this property if you're not using autoscaling thanks to the `minWorkers` and `maxWorkers` property."
+        description = "You must set this property unless you use the `minWorkers` and `maxWorkers` properties for autoscaling."
     )
     private Long numWorkers;
 
     @PluginProperty
     @Schema(
         title = "The minimum number of workers",
-        description = "Use this property along with `maxWorkers` to use autoscaling. Otherwise, use `numWorkers to use a fixed number of workers."
+        description = "Use this property along with `maxWorkers` for autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
     )
     private Long minWorkers;
 
     @PluginProperty
     @Schema(
         title = "The maximum number of workers",
-        description = "Use this property along with `minWorkers` to use autoscaling. Otherwise, use `numWorkers to use a fixed number of workers."
+        description = "Use this property along with `minWorkers` to use autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
     )
     private Long maxWorkers;
 
