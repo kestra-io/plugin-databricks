@@ -55,8 +55,7 @@ import javax.validation.constraints.NotNull;
                 accessToken: <your-accessToken>
                 host: <your-host>
                 httpPath: <your-httpPath>
-                sql: SELECT 1
-                """
+                sql: SELECT 1"""
         )
     },
     metrics = {
@@ -64,7 +63,7 @@ import javax.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Execute an SQL query on a Databricks cluster",
+    title = "Execute a SQL query on a Databricks cluster",
     description = """
         See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
         We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
@@ -80,7 +79,10 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "Databricks cluster HTTP Path")
+    @Schema(
+        title = "Databricks cluster HTTP Path",
+        description = "To retrieve the HTTP Path, go to your Databricks cluster, click on Advanced options then, click on JDBC/ODBC. See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url) for more details."
+    )
     private String httpPath;
 
     @PluginProperty(dynamic = true)
@@ -215,12 +217,12 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The url of the result file on kestra storage (.ion file / Amazon Ion text format)"
+            title = "The URL of the result file in Kestra storage (`.ion` file i.e. Amazon Ion text format)"
         )
         private final URI uri;
 
         @Schema(
-            title = "The size of the fetched rows"
+            title = "The number of fetched rows"
         )
         private final Long size;
     }

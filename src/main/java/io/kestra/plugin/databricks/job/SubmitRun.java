@@ -38,7 +38,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 @Plugin(examples = {
     @Example(
-        title = "Submit a Databricks run and wait 5mn for completion",
+        title = "Submit a Databricks run and wait up to 5 minutes for its completion",
         code = """
             id: submitRun
             type: io.kestra.plugin.databricks.job.SubmitRun
@@ -51,11 +51,10 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                 sparkPythonTask:
                   pythonFile: /Shared/hello.py
                   sparkPythonTaskSource: WORKSPACE
-            waitForCompletion: PT5M
-            """
+            waitForCompletion: PT5M"""
     )
 })
-@Schema(title = "Submit a Databricks run, use `waitForCompletion` if you want the task to wait for the run to complete")
+@Schema(title = "Submit a Databricks run. Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion.")
 public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @PluginProperty(dynamic = true)
     @Schema(title = "The name of the run")

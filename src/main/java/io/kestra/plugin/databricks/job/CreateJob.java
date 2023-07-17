@@ -40,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Plugin(
     examples = {
         @Example(
-            title = "Create a Databricks Job, run it, and wait 5mn for completion",
+            title = "Create a Databricks job, run it, and wait for completion for five minutes",
             code = """
                 id: createJob
                 type: io.kestra.plugin.databricks.job.CreateJob
@@ -53,19 +53,18 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                     sparkPythonTask:
                       pythonFile: /Shared/hello.py
                       sparkPythonTaskSource: WORKSPACE
-                waitForCompletion: PT5M
-                """
+                waitForCompletion: PT5M"""
         )
     }
 )
-@Schema(title = "Create a Databricks job and run it, use `waitForCompletion` if you want the task to wait for the job to run until completion")
+@Schema(title = "Create a Databricks job and run it. Set `waitForCompletion` to the desired maximum duration if you want the task to wait for the job completion (e.g., `PT1H` to wait up to one hour).")
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
     @PluginProperty(dynamic = true)
     @Schema(title = "The name of the job")
     private String jobName;
 
     @PluginProperty
-    @Schema(title = "If set, the task will wait for the job run completion")
+    @Schema(title = "If set, the task will wait for the job run completion for up to the `waitForCompletion` duration before timing out.")
     private Duration waitForCompletion;
 
     @NotNull

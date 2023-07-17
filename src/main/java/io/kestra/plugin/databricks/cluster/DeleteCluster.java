@@ -31,8 +31,7 @@ import javax.validation.constraints.NotNull;
                 authentication:
                   token: <your-token>
                 host: <your-host>
-                clusterId: <your-cluster>
-                """
+                clusterId: <your-cluster>"""
         )
     }
 )
