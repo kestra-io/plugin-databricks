@@ -24,7 +24,7 @@ sourceCompatibility = 17
 targetCompatibility = 17
 
 group "io.kestra.plugin"
-description 'Plugin template for Kestra'
+description 'Databricks plugin for Kestra'
 
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
@@ -53,8 +53,9 @@ dependencies {
     // kestra
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
 
-    // libs included in the final jar
-    api group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    // Databricks deps
+    api "com.databricks:databricks-sdk-java:0.0.1"
+    api "com.databricks:databricks-jdbc:2.6.25-1"
 }
 
 
@@ -90,10 +91,6 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest:2.2"
     testImplementation "org.hamcrest:hamcrest-library:2.2"
-
-    // Databricks deps
-    api "com.databricks:databricks-sdk-java:0.0.1"
-    api "com.databricks:databricks-jdbc:2.6.25-1"
 }
 
 /**********************************************************************************************************************\
@@ -114,8 +111,8 @@ jar {
     manifest {
         attributes(
                 "X-Kestra-Name": project.name,
-                "X-Kestra-Title": "Template",
-                "X-Kestra-Group": project.group + ".templates",
+                "X-Kestra-Title": "Databricks",
+                "X-Kestra-Group": project.group + ".databricks",
                 "X-Kestra-Description": project.description,
                 "X-Kestra-Version": project.version
         )
