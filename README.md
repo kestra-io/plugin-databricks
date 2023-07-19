@@ -6,6 +6,7 @@
 
 ## Documentation
 * The official Kestra documentation can be found under: [kestra.io](https://kestra.io)
+* The official plugin documentation can be found [here](https://kestra.io/plugins/plugin-databricks)
 * The official documentation for developing a plugin can be found [here](https://kestra.io/docs/plugin-developer-guide/)
 
 ## License
