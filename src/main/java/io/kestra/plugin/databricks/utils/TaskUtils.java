@@ -1,6 +1,6 @@
 package io.kestra.plugin.databricks.utils;
 
-import com.databricks.sdk.service.jobs.TaskDependenciesItem;
+import com.databricks.sdk.service.jobs.TaskDependency;
 
 import java.util.List;
 
@@ -9,9 +9,9 @@ public final class TaskUtils {
         //utility class pattern
     }
 
-    public static List<TaskDependenciesItem> dependsOn(List<String> dependsOn) {
+    public static List<TaskDependency> dependsOn(List<String> dependsOn) {
         return dependsOn == null ? null : dependsOn.stream()
-            .map(taskKey -> new TaskDependenciesItem().setTaskKey(taskKey))
+            .map(taskKey -> new TaskDependency().setTaskKey(taskKey))
             .toList();
     }
 }

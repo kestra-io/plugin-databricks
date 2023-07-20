@@ -1,7 +1,7 @@
 package io.kestra.plugin.databricks.job.task;
 
+import com.databricks.sdk.service.jobs.Source;
 import com.databricks.sdk.service.jobs.SparkPythonTask;
-import com.databricks.sdk.service.jobs.SparkPythonTaskSource;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.runners.RunContext;
@@ -24,7 +24,7 @@ public class SparkPythonTaskSetting {
 
     @PluginProperty
     @NotNull
-    private SparkPythonTaskSource sparkPythonTaskSource;
+    private Source sparkPythonTaskSource;
 
     public SparkPythonTask toSparkPythonTask(RunContext runContext) throws IllegalVariableEvaluationException {
         return new SparkPythonTask()

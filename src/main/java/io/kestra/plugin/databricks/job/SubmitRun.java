@@ -1,7 +1,6 @@
 package io.kestra.plugin.databricks.job;
 
-import com.databricks.sdk.service.jobs.RunSubmitTaskSettings;
-import com.databricks.sdk.service.jobs.TaskDependenciesItem;
+import com.databricks.sdk.service.jobs.SubmitTask;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -72,8 +71,8 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        List<RunSubmitTaskSettings> tasks = runTasks.stream().map(throwFunction(setting ->
-            new RunSubmitTaskSettings()
+        List<SubmitTask> tasks = runTasks.stream().map(throwFunction(setting ->
+            new SubmitTask()
                 .setExistingClusterId(runContext.render(setting.existingClusterId))
                 .setTaskKey(runContext.render(setting.taskKey))
                 .setTimeoutSeconds(setting.timeoutSeconds)

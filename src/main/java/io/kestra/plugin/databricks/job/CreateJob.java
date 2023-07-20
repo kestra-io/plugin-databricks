@@ -1,6 +1,6 @@
 package io.kestra.plugin.databricks.job;
 
-import com.databricks.sdk.service.jobs.JobTaskSettings;
+import com.databricks.sdk.service.jobs.Task;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -75,8 +75,8 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        List<JobTaskSettings> tasks = jobTasks.stream().map(throwFunction(
-            setting -> new JobTaskSettings()
+        List<Task> tasks = jobTasks.stream().map(throwFunction(
+            setting -> new Task()
                 .setDescription(runContext.render(setting.description))
                 .setExistingClusterId(runContext.render(setting.existingClusterId))
                 .setTaskKey(runContext.render(setting.taskKey))

@@ -1,7 +1,7 @@
 package io.kestra.plugin.databricks.job.task;
 
 import com.databricks.sdk.service.jobs.NotebookTask;
-import com.databricks.sdk.service.jobs.NotebookTaskSource;
+import com.databricks.sdk.service.jobs.Source;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.runners.RunContext;
@@ -17,7 +17,7 @@ public class NotebookTaskSetting {
     private String notebookPath;
 
     @PluginProperty
-    private NotebookTaskSource source;
+    private Source source;
 
     @PluginProperty
     private Map<String, String> baseParameters;
