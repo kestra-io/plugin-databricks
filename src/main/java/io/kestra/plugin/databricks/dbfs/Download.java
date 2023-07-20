@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.File;
@@ -65,9 +67,9 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     @Override
     public Output run(RunContext runContext) throws Exception {
         var path = runContext.render(from);
-        var extension = path.substring(path.lastIndexOf('.') + 1);
-        var workspace = workspaceClient(runContext);
+        var extension = FilenameUtils.getExtension(path);
         File tempFile = runContext.tempFile(extension).toFile();
+        var workspace = workspaceClient(runContext);
 
         try (InputStream in = workspace.dbfs().open(path);
              OutputStream out = new FileOutputStream(tempFile)) {
