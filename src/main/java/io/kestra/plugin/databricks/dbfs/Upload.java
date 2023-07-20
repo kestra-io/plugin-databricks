@@ -30,14 +30,14 @@ import javax.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Upload a file to DBFS",
+            title = "Upload a file to the Databricks File System",
             code = """
                 id: uploadFile
                 type: io.kestra.plugin.databricks.dbfs.Upload
                 authentication:
                   token: <your-token>
                 host: <your-host>
-                from: "{{inputs.somFile}}"
+                from: "{{inputs.someFile}}"
                 to: /Share/myFile.txt"""
         )
     },
@@ -51,7 +51,7 @@ import javax.validation.constraints.NotNull;
 )
 @Schema(
     title = "Upload a file",
-    description = "The file can be of any size, upload will be made by chunks of 1MB."
+    description = "The file can be of any size. The task will upload the file in chunks of 1MB."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(
