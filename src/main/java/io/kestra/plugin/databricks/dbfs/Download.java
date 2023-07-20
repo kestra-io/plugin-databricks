@@ -32,10 +32,10 @@ import javax.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Upload a file to DBFS",
+            title = "Download a file from the Databricks File System",
             code = """
-                id: uploadFile
-                type: io.kestra.plugin.databricks.dbfs.Upload
+                id: downloadFile
+                type: io.kestra.plugin.databricks.dbfs.Download
                 authentication:
                   token: <your-token>
                 host: <your-host>
@@ -52,7 +52,7 @@ import javax.validation.constraints.NotNull;
 )
 @Schema(
     title = "Download a file",
-    description = "The file can be of any size, download will be made by chunks of 1MB."
+    description = "The file can be of any size. The task will download the file in chunks of 1MB."
 )
 public class Download extends AbstractTask implements RunnableTask<Download.Output> {
     @Schema(
@@ -83,7 +83,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     public static class Output implements io.kestra.core.models.tasks.Output {
 
         @Schema(
-            title = "The url of the downloaded file on Kestra internal storage "
+            title = "The URL of the file downloaded to Kestra's internal storage "
         )
         private final URI uri;
     }
