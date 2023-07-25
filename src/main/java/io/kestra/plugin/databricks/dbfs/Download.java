@@ -67,8 +67,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     @Override
     public Output run(RunContext runContext) throws Exception {
         var path = runContext.render(from);
-        var extension = FilenameUtils.getExtension(path);
-        File tempFile = runContext.tempFile(extension).toFile();
+        File tempFile = runContext.tempFile(runContext.fileExtension(path)).toFile();
         var workspace = workspaceClient(runContext);
 
         try (InputStream in = workspace.dbfs().open(path);

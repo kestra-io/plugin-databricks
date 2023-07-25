@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.notNullValue;
 
 @MicronautTest
@@ -37,5 +38,6 @@ class DownloadTest {
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output.getUri(), notNullValue());
+        assertThat(output.getUri().toString(), endsWith(".txt"));
     }
 }
