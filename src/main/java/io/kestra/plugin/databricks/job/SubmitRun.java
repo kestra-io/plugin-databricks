@@ -44,7 +44,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             authentication:
               token: <your-token>
             host: <your-host>
-            runSTasks:
+            runTasks:
               - existingClusterId: <your-cluster>
                 taskKey: taskKey
                 sparkPythonTask:
