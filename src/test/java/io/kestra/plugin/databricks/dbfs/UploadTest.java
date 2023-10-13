@@ -34,6 +34,7 @@ class UploadTest {
     @Test
     void run() throws Exception {
         URI source = storageInterface.put(
+            null,
             new URI("/" + IdUtils.create()),
             new FileInputStream(new File(Objects.requireNonNull(UploadTest.class.getClassLoader()
                     .getResource("test.txt"))
