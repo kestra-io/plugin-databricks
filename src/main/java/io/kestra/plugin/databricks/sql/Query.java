@@ -34,7 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.function.Consumer;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
