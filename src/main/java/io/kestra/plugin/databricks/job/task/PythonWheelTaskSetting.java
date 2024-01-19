@@ -19,7 +19,7 @@ public class PythonWheelTaskSetting {
     @PluginProperty(dynamic = true)
     private List<String> parameters;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private Map<String, String> namedParameters;
 
     @PluginProperty(dynamic = true)
@@ -29,7 +29,7 @@ public class PythonWheelTaskSetting {
         return new PythonWheelTask()
             .setEntryPoint(runContext.render(entryPoint))
             .setParameters(parameters != null ? runContext.render(parameters) : null)
-            .setNamedParameters(namedParameters)
+            .setNamedParameters(namedParameters != null ? runContext.renderMap(namedParameters) : null)
             .setPackageName(runContext.render(packageName));
     }
 }
