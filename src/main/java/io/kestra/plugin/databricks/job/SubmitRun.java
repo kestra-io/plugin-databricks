@@ -7,12 +7,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
-import io.kestra.plugin.databricks.job.task.NotebookTaskSetting;
-import io.kestra.plugin.databricks.job.task.PipelineTaskSetting;
-import io.kestra.plugin.databricks.job.task.PythonWheelTaskSetting;
-import io.kestra.plugin.databricks.job.task.SparkJarTaskSetting;
-import io.kestra.plugin.databricks.job.task.SparkPythonTaskSetting;
-import io.kestra.plugin.databricks.job.task.SparkSubmitTaskSetting;
+import io.kestra.plugin.databricks.job.task.*;
 import io.kestra.plugin.databricks.utils.TaskUtils;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -82,7 +77,8 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
                 .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
                 .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
                 .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
-                .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))))
+                .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))
+                .setLibraries(setting.libraries != null ? setting.libraries.stream().map(throwFunction(l -> l.toLibrary(runContext))).toList() : null)))
             .toList();
 
         var workspaceClient = workspaceClient(runContext);
@@ -145,6 +141,10 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         @PluginProperty
         @Schema(title = "Task dependencies, set this if multiple tasks are defined on the run")
         private List<String> dependsOn;
+
+        @PluginProperty
+        @Schema(title = "Task libraries")
+        private List<LibrarySetting> libraries;
     }
 
     @Builder
