@@ -19,13 +19,13 @@ public class SqlTaskSetting {
     @PluginProperty(dynamic = true)
     private String queryId;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private Map<String, String> parameters;
 
     public SqlTask toSqlTask(RunContext runContext) throws IllegalVariableEvaluationException {
         return new SqlTask()
             .setWarehouseId(runContext.render(warehouseId))
-            .setParameters(parameters)
+            .setParameters(parameters != null ? runContext.renderMap(parameters) : null)
             .setQuery(new SqlTaskQuery().setQueryId(runContext.render(queryId)));
     }
 }

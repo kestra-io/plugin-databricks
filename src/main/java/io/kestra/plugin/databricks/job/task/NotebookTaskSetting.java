@@ -19,13 +19,13 @@ public class NotebookTaskSetting {
     @PluginProperty
     private Source source;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private Map<String, String> baseParameters;
 
     public NotebookTask toNotebookTask(RunContext runContext) throws IllegalVariableEvaluationException {
         return new NotebookTask()
             .setNotebookPath(runContext.render(notebookPath))
             .setSource(source)
-            .setBaseParameters(baseParameters);
+            .setBaseParameters(baseParameters != null ? runContext.renderMap(baseParameters) : null);
     }
 }
