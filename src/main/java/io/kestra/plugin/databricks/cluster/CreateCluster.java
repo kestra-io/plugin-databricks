@@ -49,11 +49,11 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     private String clusterName;
 
     @NotNull
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     @Schema(title = "The Spark version")
     private String sparkVersion;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     @Schema(title = "The type of node, the value depends on the cloud provider")
     private String nodeTypeId;
 
@@ -86,8 +86,8 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     public Output run(RunContext runContext) throws Exception {
         var createCluster = new com.databricks.sdk.service.compute.CreateCluster()
                 .setClusterName(runContext.render(clusterName))
-                .setSparkVersion(sparkVersion)
-                .setNodeTypeId(nodeTypeId)
+                .setSparkVersion(runContext.render(sparkVersion))
+                .setNodeTypeId(runContext.render(nodeTypeId))
                 .setAutoterminationMinutes(autoTerminationMinutes)
                 .setNumWorkers(numWorkers);
         if (minWorkers != null && maxWorkers != null) {

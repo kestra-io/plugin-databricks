@@ -47,7 +47,6 @@ public abstract class AbstractTask extends Task {
     )
     private AuthenticationConfig authentication;
 
-
     protected WorkspaceClient workspaceClient(RunContext runContext) throws IllegalVariableEvaluationException {
         DatabricksConfig cfg = new DatabricksConfig()
             .setHost(runContext.render(host))
@@ -55,7 +54,7 @@ public abstract class AbstractTask extends Task {
             .setConfigFile(runContext.render(configFile));
 
         if (authentication != null) {
-            cfg.setAuthType(authentication.authType)
+            cfg.setAuthType(runContext.render(authentication.authType))
                 .setToken(runContext.render(authentication.token))
                 .setUsername(runContext.render(authentication.username))
                 .setPassword(runContext.render(authentication.password))
@@ -78,7 +77,7 @@ public abstract class AbstractTask extends Task {
     @Builder
     @Getter
     public static class AuthenticationConfig {
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         private String authType;
 
         @PluginProperty(dynamic = true)
