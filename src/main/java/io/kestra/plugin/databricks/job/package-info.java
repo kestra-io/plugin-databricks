@@ -1,5 +1,5 @@
 @PluginSubGroup(
-    title = "Databricks",
+    title = "Job",
     description = "This sub-group of plugins contains tasks for launching jobs on a Databricks cluster.",
     categories = { PluginSubGroup.PluginCategory.TOOL, PluginSubGroup.PluginCategory.CLOUD }
 )

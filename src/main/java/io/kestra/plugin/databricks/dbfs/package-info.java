@@ -1,5 +1,5 @@
 @PluginSubGroup(
-    title = "Databricks",
+    title = "DBFS",
     description = "This subgroup of plugins contains tasks for managing files on the Databricks File System (DBFS).",
     categories = { PluginSubGroup.PluginCategory.STORAGE, PluginSubGroup.PluginCategory.CLOUD }
 )
