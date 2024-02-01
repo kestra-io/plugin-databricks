@@ -20,12 +20,19 @@ public class SparkJarTaskSetting {
     private String mainClassName;
 
     @PluginProperty(dynamic = true)
-    private List<String> parameters;
+    @Schema(
+        title = "List of task parameters.",
+        description = "Can be a list of strings or a variable that binds to a JSON array of strings.",
+        anyOf = {String.class, String[].class}
+    )
+    private Object parameters;
 
     public SparkJarTask toSparkJarTask(RunContext runContext) throws IllegalVariableEvaluationException {
+        List<String> renderedParameters = ParametersUtils.listParameters(runContext, parameters);
+
         return new SparkJarTask()
             .setJarUri(runContext.render(jarUri))
             .setMainClassName(runContext.render(mainClassName))
-            .setParameters(parameters != null ? runContext.render(parameters) : null);
+            .setParameters(renderedParameters);
     }
 }
