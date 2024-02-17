@@ -32,7 +32,8 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @NoArgsConstructor
 @Plugin(examples = {
     @Example(
-        title = "Submit a Databricks run and wait up to 5 minutes for its completion",
+        title = "Submit a Databricks run and wait up to 5 minutes for its completion.",
+        full = true,
         code = """
             id: submitRun
             type: io.kestra.plugin.databricks.job.SubmitRun
@@ -51,17 +52,17 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @Schema(title = "Submit a Databricks run. Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion.")
 public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @PluginProperty(dynamic = true)
-    @Schema(title = "The name of the run")
+    @Schema(title = "The name of the run.")
     private String runName;
 
     @PluginProperty
-    @Schema(title = "If set, the task will wait for the run completion")
+    @Schema(title = "If set, the task will wait for the run completion.")
     private Duration waitForCompletion;
 
     @NotNull
     @NotEmpty
     @PluginProperty
-    @Schema(title = "The run tasks, if multiple tasks are defined you must set `dependsOn` on each task")
+    @Schema(title = "The run tasks, if multiple tasks are defined you must set `dependsOn` on each task.")
     private List<RunSubmitTaskSetting> runTasks;
 
     @Override
@@ -115,45 +116,45 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         private Long timeoutSeconds;
 
         @PluginProperty
-        @Schema(title = "Notebook task settings")
+        @Schema(title = "Notebook task settings.")
         private NotebookTaskSetting notebookTask;
 
         @PluginProperty
-        @Schema(title = "Spark Submit task settings")
+        @Schema(title = "Spark Submit task settings.")
         private SparkSubmitTaskSetting sparkSubmitTask;
 
         @PluginProperty
-        @Schema(title = "Spark JAR task settings")
+        @Schema(title = "Spark JAR task settings.")
         private SparkJarTaskSetting sparkJarTask;
 
         @PluginProperty
-        @Schema(title = "Spark Python task settings")
+        @Schema(title = "Spark Python task settings.")
         private SparkPythonTaskSetting sparkPythonTask;
 
         @PluginProperty
-        @Schema(title = "Python Wheel task settings")
+        @Schema(title = "Python Wheel task settings.")
         private PythonWheelTaskSetting pythonWheelTask;
 
         @PluginProperty
-        @Schema(title = "Pipeline task settings")
+        @Schema(title = "Pipeline task settings.")
         private PipelineTaskSetting pipelineTask;
 
         @PluginProperty
-        @Schema(title = "Task dependencies, set this if multiple tasks are defined on the run")
+        @Schema(title = "Task dependencies, set this if multiple tasks are defined on the run.")
         private List<String> dependsOn;
 
         @PluginProperty
-        @Schema(title = "Task libraries")
+        @Schema(title = "Task libraries.")
         private List<LibrarySetting> libraries;
     }
 
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The run identifier")
+        @Schema(title = "The run identifier.")
         private Long runId;
 
-        @Schema(title = "The run URI on the Databricks console")
+        @Schema(title = "The run URI on the Databricks console.")
         private URI runURI;
     }
 }

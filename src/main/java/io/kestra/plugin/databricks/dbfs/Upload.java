@@ -30,7 +30,8 @@ import jakarta.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Upload a file to the Databricks File System",
+            title = "Upload a file to the Databricks File System.",
+            full = true,
             code = """
                 id: uploadFile
                 type: io.kestra.plugin.databricks.dbfs.Upload
@@ -50,12 +51,12 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Upload a file",
+    title = "Upload a file to the Databricks File System.",
     description = "The file can be of any size. The task will upload the file in chunks of 1MB."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(
-        title = "The file to upload",
+        title = "The file to upload.",
         description = "Must be a file from Kestra internal storage."
     )
     @PluginProperty(dynamic = true)
@@ -63,7 +64,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     private String from;
 
     @Schema(
-        title = "The destination path"
+        title = "The destination path."
     )
     @PluginProperty(dynamic = true)
     @NotNull
