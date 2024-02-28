@@ -27,7 +27,8 @@ import jakarta.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Create a Databricks cluster with one worker",
+            title = "Create a Databricks cluster with one worker.",
+            full = true,
             code = """
                 id: createCluster
                 type: io.kestra.plugin.databricks.cluster.CreateCluster
@@ -41,43 +42,43 @@ import jakarta.validation.constraints.NotNull;
         )
     }
 )
-@Schema(title = "Create a Databricks cluster")
+@Schema(title = "Create a Databricks cluster.")
 public class CreateCluster extends AbstractTask implements RunnableTask<CreateCluster.Output> {
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "The name of the cluster")
+    @Schema(title = "The name of the cluster.")
     private String clusterName;
 
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "The Spark version")
+    @Schema(title = "The Spark version.")
     private String sparkVersion;
 
     @PluginProperty(dynamic = true)
-    @Schema(title = "The type of node, the value depends on the cloud provider")
+    @Schema(title = "The type of node, the value depends on the cloud provider.")
     private String nodeTypeId;
 
     @PluginProperty
-    @Schema(title = "If set, the cluster will be terminated automatically after this time period")
+    @Schema(title = "If set, the cluster will be terminated automatically after this time period.")
     private Long autoTerminationMinutes;
 
     @PluginProperty
     @Schema(
-        title = "The fixed number of workers",
+        title = "The fixed number of workers.",
         description = "You must set this property unless you use the `minWorkers` and `maxWorkers` properties for autoscaling."
     )
     private Long numWorkers;
 
     @PluginProperty
     @Schema(
-        title = "The minimum number of workers",
+        title = "The minimum number of workers.",
         description = "Use this property along with `maxWorkers` for autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
     )
     private Long minWorkers;
 
     @PluginProperty
     @Schema(
-        title = "The maximum number of workers",
+        title = "The maximum number of workers.",
         description = "Use this property along with `minWorkers` to use autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
     )
     private Long maxWorkers;
@@ -109,13 +110,13 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The cluster identifier")
+        @Schema(title = "The cluster identifier.")
         private String clusterId;
 
-        @Schema(title = "The cluster URI on the Databricks console")
+        @Schema(title = "The cluster URI on the Databricks console.")
         private URI clusterURI;
 
-        @Schema(title = "The cluster state")
+        @Schema(title = "The cluster state.")
         private State clusterState;
     }
 }

@@ -24,7 +24,8 @@ import jakarta.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Delete a Databricks cluster",
+            title = "Delete a Databricks cluster.",
+            full = true,
             code = """
                 id: deleteCluster
                 type: io.kestra.plugin.databricks.cluster.DeleteCluster
@@ -35,11 +36,11 @@ import jakarta.validation.constraints.NotNull;
         )
     }
 )
-@Schema(title = "Delete a Databricks cluster")
+@Schema(title = "Delete a Databricks cluster.")
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "The cluster identifier")
+    @Schema(title = "The cluster identifier.")
     private String clusterId;
 
     @Override

@@ -32,7 +32,8 @@ import jakarta.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
-            title = "Download a file from the Databricks File System",
+            title = "Download a file from the Databricks File System.",
+            full = true,
             code = """
                 id: downloadFile
                 type: io.kestra.plugin.databricks.dbfs.Download
@@ -51,12 +52,12 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Download a file",
+    title = "Download a file from Databricks File System.",
     description = "The file can be of any size. The task will download the file in chunks of 1MB."
 )
 public class Download extends AbstractTask implements RunnableTask<Download.Output> {
     @Schema(
-        title = "The file to download"
+        title = "The file to download."
     )
     @PluginProperty(dynamic = true)
     @NotNull
@@ -82,7 +83,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     public static class Output implements io.kestra.core.models.tasks.Output {
 
         @Schema(
-            title = "The URL of the file downloaded to Kestra's internal storage "
+            title = "The URI of the file downloaded to Kestra's internal storage."
         )
         private final URI uri;
     }

@@ -49,6 +49,7 @@ import jakarta.validation.constraints.NotNull;
 @Plugin(
     examples = {
         @Example(
+            full = true,
             code = """
                 id: sqlQuery
                 type: io.kestra.plugin.databricks.sql.Query
@@ -63,7 +64,7 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Execute a SQL query on a Databricks cluster",
+    title = "Execute a SQL query on a Databricks cluster.",
     description = """
         See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
         We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
@@ -74,13 +75,13 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "Databricks host")
+    @Schema(title = "Databricks host.")
     private String host;
 
     @NotNull
     @PluginProperty(dynamic = true)
     @Schema(
-        title = "Databricks cluster HTTP Path",
+        title = "Databricks cluster HTTP Path.",
         description = "To retrieve the HTTP Path, go to your Databricks cluster, click on Advanced options then, click on JDBC/ODBC. See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url) for more details."
     )
     private String httpPath;
@@ -92,7 +93,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     private String schema;
 
     @PluginProperty(dynamic = true)
-    @Schema(title = "Databricks access token")
+    @Schema(title = "Databricks access token.")
     private String accessToken;
 
     @PluginProperty
@@ -100,7 +101,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @NotNull
     @PluginProperty(dynamic = true)
-    @Schema(title = "SQL query")
+    @Schema(title = "SQL query to be executed.")
     private String sql;
 
     @Schema(
@@ -217,12 +218,12 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The URL of the result file in Kestra storage (`.ion` file i.e. Amazon Ion text format)"
+            title = "The URI of the result file in Kestra's internal storage (`.ion` file i.e. Amazon Ion text format)."
         )
         private final URI uri;
 
         @Schema(
-            title = "The number of fetched rows"
+            title = "The number of fetched rows."
         )
         private final Long size;
     }
