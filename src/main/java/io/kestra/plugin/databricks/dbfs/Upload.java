@@ -75,7 +75,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         var path = runContext.render(to);
         var workspace = workspaceClient(runContext);
 
-        try (InputStream in = runContext.uriToInputStream(URI.create(runContext.render(from)));
+        try (InputStream in = runContext.storage().getFile(URI.create(runContext.render(from)));
              OutputStream out = workspace.dbfs().getOutputStream(path)) {
             int size = IOUtils.copy(in, out);
             runContext.metric(Counter.of("file.size", size));
