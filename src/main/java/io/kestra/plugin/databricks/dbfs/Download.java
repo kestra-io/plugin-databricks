@@ -73,7 +73,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
              OutputStream out = new FileOutputStream(tempFile)) {
             int size = IOUtils.copy(in, out);
             runContext.metric(Counter.of("file.size", size));
-            var uri = runContext.putTempFile(tempFile);
+            var uri = runContext.storage().putFile(tempFile);
             return Output.builder().uri(uri).build();
         }
     }

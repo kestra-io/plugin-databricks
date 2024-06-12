@@ -147,7 +147,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
                     runContext.metric(Counter.of("fetch.size",  size));
 
                     return Output.builder()
-                        .uri(runContext.putTempFile(tempFile))
+                        .uri(runContext.storage().putFile(tempFile))
                         .size(size)
                         .build();
                 }
