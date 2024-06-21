@@ -138,7 +138,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
             if (stmt.execute(query)) {
                 try (ResultSet rs = stmt.getResultSet()) {
-                    File tempFile = runContext.tempFile(".ion").toFile();
+                    File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
                     BufferedWriter fileWriter = new BufferedWriter(new FileWriter(tempFile));
                     long size = fetchToFile(stmt, rs, fileWriter, new DatabricksCellConverter(zoneId()), connection);
                     fileWriter.flush();

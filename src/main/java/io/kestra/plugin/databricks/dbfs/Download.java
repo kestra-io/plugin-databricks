@@ -7,6 +7,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.utils.FileUtils;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -66,7 +67,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     @Override
     public Output run(RunContext runContext) throws Exception {
         var path = runContext.render(from);
-        File tempFile = runContext.tempFile(runContext.fileExtension(path)).toFile();
+        File tempFile = runContext.workingDir().createTempFile(FileUtils.getExtension(path)).toFile();
         var workspace = workspaceClient(runContext);
 
         try (InputStream in = workspace.dbfs().open(path);
