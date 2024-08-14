@@ -69,7 +69,7 @@ import jakarta.validation.constraints.NotNull;
         See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
         We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
         
-        Due to current limitation of the JDBC driver with Java 21, Arrow is disabled, performance may be impacted, see [here](https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370) and [here](https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297) fro Databricks status on Java 21 support.
+        Due to current limitation of the JDBC driver with Java 21, Arrow is disabled, performance may be impacted, see [here](https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370) and [here](https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297) from Databricks status on Java 21 support.
         """
 )
 public class Query extends Task implements RunnableTask<Query.Output> {
