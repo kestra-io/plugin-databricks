@@ -33,13 +33,23 @@ import jakarta.validation.constraints.NotNull;
             title = "Upload a file to the Databricks File System.",
             full = true,
             code = """
-                id: uploadFile
-                type: io.kestra.plugin.databricks.dbfs.Upload
-                authentication:
-                  token: <your-token>
-                host: <your-host>
-                from: "{{inputs.someFile}}"
-                to: /Share/myFile.txt"""
+                id: databricks_dbfs_upload
+                namespace: company.team
+
+                inputs:
+                  - id: file
+                    type: FILE
+                    description: File to be uploaded to DBFS
+
+                tasks:
+                  - id: upload_file
+                    type: io.kestra.plugin.databricks.dbfs.Upload
+                    authentication:
+                      token: <your-token>
+                    host: <your-host>
+                    from: "{{ inputs.file }}"
+                    to: /Share/myFile.txt
+                """
         )
     },
     metrics = {

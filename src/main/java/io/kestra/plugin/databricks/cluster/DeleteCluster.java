@@ -27,12 +27,17 @@ import jakarta.validation.constraints.NotNull;
             title = "Delete a Databricks cluster.",
             full = true,
             code = """
-                id: deleteCluster
-                type: io.kestra.plugin.databricks.cluster.DeleteCluster
-                authentication:
-                  token: <your-token>
-                host: <your-host>
-                clusterId: <your-cluster>"""
+                id: databricks_delete_cluster
+                namespace: company.team
+
+                tasks:
+                  - id: delete_cluster
+                    type: io.kestra.plugin.databricks.cluster.DeleteCluster
+                    authentication:
+                      token: <your-token>
+                    host: <your-host>
+                    clusterId: <your-cluster>
+                """
         )
     }
 )

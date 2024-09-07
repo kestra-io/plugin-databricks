@@ -35,18 +35,23 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
         title = "Submit a Databricks run and wait up to 5 minutes for its completion.",
         full = true,
         code = """
-            id: submitRun
-            type: io.kestra.plugin.databricks.job.SubmitRun
-            authentication:
-              token: <your-token>
-            host: <your-host>
-            runTasks:
-              - existingClusterId: <your-cluster>
-                taskKey: taskKey
-                sparkPythonTask:
-                  pythonFile: /Shared/hello.py
-                  sparkPythonTaskSource: WORKSPACE
-            waitForCompletion: PT5M"""
+            id: databricks_job_submit_run
+            namespace: company.team
+
+            tasks:
+              - id: submit_run
+                type: io.kestra.plugin.databricks.job.SubmitRun
+                authentication:
+                  token: <your-token>
+                host: <your-host>
+                runTasks:
+                  - existingClusterId: <your-cluster>
+                    taskKey: taskKey
+                    sparkPythonTask:
+                      pythonFile: /Shared/hello.py
+                      sparkPythonTaskSource: WORKSPACE
+                waitForCompletion: PT5M
+            """
     )
 })
 @Schema(title = "Submit a Databricks run. Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion.")

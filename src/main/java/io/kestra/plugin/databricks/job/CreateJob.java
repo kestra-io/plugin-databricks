@@ -36,18 +36,23 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             title = "Create a Databricks job, run it, and wait for completion for five minutes.",
             full = true,
             code = """
-                id: createJob
-                type: io.kestra.plugin.databricks.job.CreateJob
-                authentication:
-                  token: <your-token>
-                host: <your-host>
-                jobTasks:
-                  - existingClusterId: <your-cluster>
-                    taskKey: taskKey
-                    sparkPythonTask:
-                      pythonFile: /Shared/hello.py
-                      sparkPythonTaskSource: WORKSPACE
-                waitForCompletion: PT5M"""
+                id: databricks_job_create
+                namespace: company.team
+
+                tasks:  
+                  - id: create_job
+                    type: io.kestra.plugin.databricks.job.CreateJob
+                    authentication:
+                      token: <your-token>
+                    host: <your-host>
+                    jobTasks:
+                      - existingClusterId: <your-cluster>
+                        taskKey: taskKey
+                        sparkPythonTask:
+                          pythonFile: /Shared/hello.py
+                          sparkPythonTaskSource: WORKSPACE
+                    waitForCompletion: PT5M
+                """
         )
     }
 )

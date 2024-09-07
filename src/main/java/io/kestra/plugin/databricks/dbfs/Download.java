@@ -36,12 +36,17 @@ import jakarta.validation.constraints.NotNull;
             title = "Download a file from the Databricks File System.",
             full = true,
             code = """
-                id: downloadFile
-                type: io.kestra.plugin.databricks.dbfs.Download
-                authentication:
-                  token: <your-token>
-                host: <your-host>
-                from: /Share/myFile.txt"""
+                id: databricks_dbfs_download
+                namespace: company.team
+
+                tasks:
+                  - id: download_file
+                    type: io.kestra.plugin.databricks.dbfs.Download
+                    authentication:
+                      token: <your-token>
+                    host: <your-host>
+                    from: /Share/myFile.txt
+                """
         )
     },
     metrics = {
