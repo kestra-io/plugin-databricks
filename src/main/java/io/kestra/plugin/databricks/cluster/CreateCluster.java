@@ -30,15 +30,20 @@ import jakarta.validation.constraints.NotNull;
             title = "Create a Databricks cluster with one worker.",
             full = true,
             code = """
-                id: createCluster
-                type: io.kestra.plugin.databricks.cluster.CreateCluster
-                authentication:
-                  token: <your-token>
-                host: <your-host>
-                clusterName: kestra-demo
-                nodeTypeId: n2-highmem-4
-                numWorkers: 1
-                sparkVersion: 13.0.x-scala2.12"""
+                id: databricks_create_cluster
+                namespace: company.team
+
+                tasks:
+                  - id: create_cluster
+                    type: io.kestra.plugin.databricks.cluster.CreateCluster
+                    authentication:
+                      token: <your-token>
+                    host: <your-host>
+                    clusterName: kestra-demo
+                    nodeTypeId: n2-highmem-4
+                    numWorkers: 1
+                    sparkVersion: 13.0.x-scala2.12
+                """
         )
     }
 )

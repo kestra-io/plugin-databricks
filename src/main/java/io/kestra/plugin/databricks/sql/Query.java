@@ -51,12 +51,17 @@ import jakarta.validation.constraints.NotNull;
         @Example(
             full = true,
             code = """
-                id: sqlQuery
-                type: io.kestra.plugin.databricks.sql.Query
-                accessToken: <your-accessToken>
-                host: <your-host>
-                httpPath: <your-httpPath>
-                sql: SELECT 1"""
+                id: databricks_sql_query
+                namespace: company.team
+
+                tasks:
+                  - id: sql_query
+                    type: io.kestra.plugin.databricks.sql.Query
+                    accessToken: <your-accessToken>
+                    host: <your-host>
+                    httpPath: <your-httpPath>
+                    sql: SELECT 1
+                """
         )
     },
     metrics = {
