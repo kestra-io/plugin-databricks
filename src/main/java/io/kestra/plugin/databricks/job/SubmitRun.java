@@ -79,6 +79,7 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
                 .setTimeoutSeconds(setting.timeoutSeconds)
                 .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
                 .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
+                .setRunJobTask(setting.runJobTask != null ? setting.runJobTask.toRunJobTask(runContext) : null)
                 .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
                 .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
                 .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
@@ -143,6 +144,10 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         @PluginProperty
         @Schema(title = "Pipeline task settings.")
         private PipelineTaskSetting pipelineTask;
+
+        @PluginProperty
+        @Schema(title = "Run job task settings.")
+        private RunJobTaskSetting runJobTask;
 
         @PluginProperty
         @Schema(title = "Task dependencies, set this if multiple tasks are defined on the run.")
