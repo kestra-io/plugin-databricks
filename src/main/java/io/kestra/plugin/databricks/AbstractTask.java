@@ -5,6 +5,7 @@ import com.databricks.sdk.core.ConfigLoader;
 import com.databricks.sdk.core.DatabricksConfig;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,17 +25,14 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractTask extends Task {
-    @PluginProperty(dynamic = true)
     @Schema(title = "Databricks host.")
-    private String host;
+    private Property<String> host;
 
-    @PluginProperty(dynamic = true)
     @Schema(title = "Databricks account identifier.")
-    private String accountId;
+    private Property<String> accountId;
 
-    @PluginProperty(dynamic = true)
     @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one.")
-    private String configFile;
+    private Property<String> configFile;
 
     @PluginProperty
     @Schema(
@@ -49,22 +47,22 @@ public abstract class AbstractTask extends Task {
 
     protected WorkspaceClient workspaceClient(RunContext runContext) throws IllegalVariableEvaluationException {
         DatabricksConfig cfg = new DatabricksConfig()
-            .setHost(runContext.render(host))
-            .setAccountId(runContext.render(accountId))
-            .setConfigFile(runContext.render(configFile));
+            .setHost(runContext.render(host).as(String.class).orElse(null))
+            .setAccountId(runContext.render(accountId).as(String.class).orElse(null))
+            .setConfigFile(runContext.render(configFile).as(String.class).orElse(null));
 
         if (authentication != null) {
-            cfg.setAuthType(runContext.render(authentication.authType))
-                .setToken(runContext.render(authentication.token))
-                .setUsername(runContext.render(authentication.username))
-                .setPassword(runContext.render(authentication.password))
-                .setClientId(runContext.render(authentication.clientId))
-                .setClientSecret(runContext.render(authentication.clientSecret))
-                .setGoogleCredentials(runContext.render(authentication.googleCredentials))
-                .setGoogleServiceAccount(runContext.render(authentication.googleServiceAccount))
-                .setAzureClientId(runContext.render(authentication.azureClientId))
-                .setAzureClientSecret(runContext.render(authentication.azureClientSecret))
-                .setAzureTenantId(runContext.render(authentication.azureTenantId));
+            cfg.setAuthType(runContext.render(authentication.authType).as(String.class).orElse(null))
+                .setToken(runContext.render(authentication.token).as(String.class).orElse(null))
+                .setUsername(runContext.render(authentication.username).as(String.class).orElse(null))
+                .setPassword(runContext.render(authentication.password).as(String.class).orElse(null))
+                .setClientId(runContext.render(authentication.clientId).as(String.class).orElse(null))
+                .setClientSecret(runContext.render(authentication.clientSecret).as(String.class).orElse(null))
+                .setGoogleCredentials(runContext.render(authentication.googleCredentials).as(String.class).orElse(null))
+                .setGoogleServiceAccount(runContext.render(authentication.googleServiceAccount).as(String.class).orElse(null))
+                .setAzureClientId(runContext.render(authentication.azureClientId).as(String.class).orElse(null))
+                .setAzureClientSecret(runContext.render(authentication.azureClientSecret).as(String.class).orElse(null))
+                .setAzureTenantId(runContext.render(authentication.azureTenantId).as(String.class).orElse(null));
         }
 
 
@@ -77,37 +75,26 @@ public abstract class AbstractTask extends Task {
     @Builder
     @Getter
     public static class AuthenticationConfig {
-        @PluginProperty(dynamic = true)
-        private String authType;
+        private Property<String> authType;
 
-        @PluginProperty(dynamic = true)
-        private String token;
+        private Property<String> token;
 
-        @PluginProperty(dynamic = true)
-        private String clientId;
+        private Property<String> clientId;
 
-        @PluginProperty(dynamic = true)
-        private String clientSecret;
+        private Property<String> clientSecret;
 
-        @PluginProperty(dynamic = true)
-        private String username;
+        private Property<String> username;
 
-        @PluginProperty(dynamic = true)
-        private String password;
+        private Property<String> password;
 
-        @PluginProperty(dynamic = true)
-        private String googleCredentials;
+        private Property<String> googleCredentials;
 
-        @PluginProperty(dynamic = true)
-        private String googleServiceAccount;
+        private Property<String> googleServiceAccount;
 
-        @PluginProperty(dynamic = true)
-        private String azureClientId;
+        private Property<String> azureClientId;
 
-        @PluginProperty(dynamic = true)
-        private String azureClientSecret;
+        private Property<String> azureClientSecret;
 
-        @PluginProperty(dynamic = true)
-        private String azureTenantId;
+        private Property<String> azureTenantId;
     }
 }

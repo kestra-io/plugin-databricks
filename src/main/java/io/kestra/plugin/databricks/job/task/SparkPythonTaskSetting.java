@@ -4,6 +4,7 @@ import com.databricks.sdk.service.jobs.Source;
 import com.databricks.sdk.service.jobs.SparkPythonTask;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -16,9 +17,8 @@ import jakarta.validation.constraints.NotNull;
 @Getter
 public class SparkPythonTaskSetting {
 
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String pythonFile;
+    private Property<String> pythonFile;
 
     @PluginProperty(dynamic = true)
     @Schema(
@@ -28,16 +28,15 @@ public class SparkPythonTaskSetting {
     )
     private Object parameters;
 
-    @PluginProperty
     @NotNull
-    private Source sparkPythonTaskSource;
+    private Property<Source> sparkPythonTaskSource;
 
     public SparkPythonTask toSparkPythonTask(RunContext runContext) throws IllegalVariableEvaluationException {
         List<String> renderedParameters = ParametersUtils.listParameters(runContext, parameters);
 
         return new SparkPythonTask()
-            .setPythonFile(runContext.render(pythonFile))
+            .setPythonFile(runContext.render(pythonFile).as(String.class).orElseThrow())
             .setParameters(renderedParameters)
-            .setSource(sparkPythonTaskSource);
+            .setSource(runContext.render(sparkPythonTaskSource).as(Source.class).orElseThrow());
     }
 }

@@ -5,6 +5,7 @@ import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.FileUtils;
@@ -65,13 +66,12 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     @Schema(
         title = "The file to download."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        var path = runContext.render(from);
+        String path = runContext.render(from).as(String.class).orElseThrow();
         File tempFile = runContext.workingDir().createTempFile(FileUtils.getExtension(path)).toFile();
         var workspace = workspaceClient(runContext);
 

@@ -6,6 +6,7 @@ import com.databricks.sdk.service.compute.PythonPyPiLibrary;
 import com.databricks.sdk.service.compute.RCranLibrary;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,11 +19,9 @@ public class LibrarySetting {
     @PluginProperty
     private CranSetting cran;
 
-    @PluginProperty(dynamic = true)
-    private String egg;
+    private Property<String> egg;
 
-    @PluginProperty(dynamic = true)
-    private String jar;
+    private Property<String> jar;
 
     @PluginProperty
     private MavenSetting maven;
@@ -30,68 +29,60 @@ public class LibrarySetting {
     @PluginProperty
     private PypiSetting pypi;
 
-    @PluginProperty(dynamic = true)
-    private String whl;
+    private Property<String> whl;
 
     public Library toLibrary(RunContext runContext) throws IllegalVariableEvaluationException {
         return new Library()
             .setCran(cran != null ? cran.toCran(runContext) : null)
-            .setEgg(runContext.render(egg))
-            .setJar(runContext.render(jar))
+            .setEgg(runContext.render(egg).as(String.class).orElse(null))
+            .setJar(runContext.render(jar).as(String.class).orElse(null))
             .setMaven(maven != null ? maven.toMaven(runContext) : null)
             .setPypi(pypi != null ? pypi.toPypi(runContext) : null)
-            .setWhl(runContext.render(whl));
+            .setWhl(runContext.render(whl).as(String.class).orElse(null));
     }
 
     @Builder
     @Getter
     public static class CranSetting {
-        @PluginProperty(dynamic = true)
-        private String _package;
+        private Property<String> _package;
 
-        @PluginProperty(dynamic = true)
-        private String repo;
+        private Property<String> repo;
 
         public RCranLibrary toCran(RunContext runContext) throws IllegalVariableEvaluationException {
             return new RCranLibrary()
-                .setPackage(runContext.render(_package))
-                .setRepo(runContext.render(repo));
+                .setPackage(runContext.render(_package).as(String.class).orElse(null))
+                .setRepo(runContext.render(repo).as(String.class).orElse(null));
         }
     }
 
     @Builder
     @Getter
     public static class MavenSetting {
-        @PluginProperty(dynamic = true)
-        private String coordinates;
+        private Property<String> coordinates;
 
-        @PluginProperty(dynamic = true)
-        private String repo;
+        private Property<String> repo;
 
-        @PluginProperty(dynamic = true)
-        private List<String> exclusions;
+        private Property<List<String>> exclusions;
 
         public MavenLibrary toMaven(RunContext runContext) throws IllegalVariableEvaluationException {
             return new MavenLibrary()
-                .setCoordinates(coordinates)
-                .setExclusions(exclusions != null ? runContext.render(exclusions) : null)
-                .setRepo(runContext.render(repo));
+                .setCoordinates(runContext.render(coordinates).as(String.class).orElse(null))
+                .setExclusions(runContext.render(exclusions).asList(String.class).isEmpty() ? null : runContext.render(exclusions).asList(String.class))
+                .setRepo(runContext.render(repo).as(String.class).orElse(null));
         }
     }
 
     @Builder
     @Getter
     public static class PypiSetting {
-        @PluginProperty(dynamic = true)
-        private String _package;
+        private Property<String> _package;
 
-        @PluginProperty(dynamic = true)
-        private String repo;
+        private Property<String> repo;
 
         public PythonPyPiLibrary toPypi(RunContext runContext) throws IllegalVariableEvaluationException {
             return new PythonPyPiLibrary()
-                .setPackage(runContext.render(_package))
-                .setRepo(runContext.render(repo));
+                .setPackage(runContext.render(_package).as(String.class).orElse(null))
+                .setRepo(runContext.render(repo).as(String.class).orElse(null));
         }
     }
 }

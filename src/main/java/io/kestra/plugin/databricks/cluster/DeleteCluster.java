@@ -3,6 +3,7 @@ package io.kestra.plugin.databricks.cluster;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
@@ -44,14 +45,13 @@ import jakarta.validation.constraints.NotNull;
 @Schema(title = "Delete a Databricks cluster.")
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
     @NotNull
-    @PluginProperty(dynamic = true)
     @Schema(title = "The cluster identifier.")
-    private String clusterId;
+    private Property<String> clusterId;
 
     @Override
     public VoidOutput run(RunContext runContext) throws Exception {
         var deleteCluster = new com.databricks.sdk.service.compute.DeleteCluster()
-            .setClusterId(runContext.render(clusterId));
+            .setClusterId(runContext.render(clusterId).as(String.class).orElseThrow());
 
         workspaceClient(runContext).clusters().delete(deleteCluster).get();
 

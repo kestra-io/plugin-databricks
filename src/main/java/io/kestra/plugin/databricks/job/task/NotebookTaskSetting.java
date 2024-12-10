@@ -4,6 +4,7 @@ import com.databricks.sdk.service.jobs.NotebookTask;
 import com.databricks.sdk.service.jobs.Source;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -14,11 +15,9 @@ import java.util.Map;
 @Builder
 @Getter
 public class NotebookTaskSetting {
-    @PluginProperty(dynamic = true)
-    private String notebookPath;
+    private Property<String> notebookPath;
 
-    @PluginProperty
-    private Source source;
+    private Property<Source> source;
 
     @PluginProperty(dynamic = true, additionalProperties = String.class)
     @Schema(
@@ -32,8 +31,8 @@ public class NotebookTaskSetting {
         Map<String, String> renderedParameters = ParametersUtils.mapParameters(runContext, baseParameters);
 
         return new NotebookTask()
-            .setNotebookPath(runContext.render(notebookPath))
-            .setSource(source)
+            .setNotebookPath(runContext.render(notebookPath).as(String.class).orElse(null))
+            .setSource(runContext.render(source).as(Source.class).orElse(null))
             .setBaseParameters(renderedParameters);
     }
 }

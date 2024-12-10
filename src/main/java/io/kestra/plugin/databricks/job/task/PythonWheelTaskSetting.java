@@ -3,6 +3,7 @@ package io.kestra.plugin.databricks.job.task;
 import com.databricks.sdk.service.jobs.PythonWheelTask;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -14,8 +15,7 @@ import java.util.Map;
 @Builder
 @Getter
 public class PythonWheelTaskSetting {
-    @PluginProperty(dynamic = true)
-    private String entryPoint;
+    private Property<String> entryPoint;
 
     @PluginProperty(dynamic = true)
     @Schema(
@@ -33,17 +33,16 @@ public class PythonWheelTaskSetting {
     )
     private Object namedParameters;
 
-    @PluginProperty(dynamic = true)
-    private String packageName;
+    private Property<String> packageName;
 
     public PythonWheelTask toPythonWheelTask(RunContext runContext) throws IllegalVariableEvaluationException {
         List<String> renderedParameters = ParametersUtils.listParameters(runContext, parameters);
         Map<String, String> renderedNamedParameters = ParametersUtils.mapParameters(runContext, namedParameters);
 
         return new PythonWheelTask()
-            .setEntryPoint(runContext.render(entryPoint))
+            .setEntryPoint(runContext.render(entryPoint).as(String.class).orElse(null))
             .setParameters(renderedParameters)
             .setNamedParameters(renderedNamedParameters)
-            .setPackageName(runContext.render(packageName));
+            .setPackageName(runContext.render(packageName).as(String.class).orElse(null));
     }
 }

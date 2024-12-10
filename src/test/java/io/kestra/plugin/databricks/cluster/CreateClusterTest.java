@@ -2,6 +2,7 @@ package io.kestra.plugin.databricks.cluster;
 
 import com.databricks.sdk.service.compute.State;
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -32,13 +33,13 @@ class CreateClusterTest {
             .id(IdUtils.create())
             .type(CreateCluster.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(TOKEN).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
             )
-            .host(HOST)
-            .clusterName(CLUSTER_NAME)
-            .nodeTypeId("n2-highmem-4")
-            .numWorkers(1L)
-            .sparkVersion("13.0.x-scala2.12")
+            .host(Property.of(HOST))
+            .clusterName(Property.of(CLUSTER_NAME))
+            .nodeTypeId(Property.of("n2-highmem-4"))
+            .numWorkers(Property.of(1L))
+            .sparkVersion(Property.of("13.0.x-scala2.12"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

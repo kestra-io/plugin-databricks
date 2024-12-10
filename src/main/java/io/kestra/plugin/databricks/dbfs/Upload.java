@@ -5,6 +5,7 @@ import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
@@ -69,23 +70,21 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         title = "The file to upload.",
         description = "Must be a file from Kestra internal storage."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String from;
+    private Property<String> from;
 
     @Schema(
         title = "The destination path."
     )
-    @PluginProperty(dynamic = true)
     @NotNull
-    private String to;
+    private Property<String> to;
 
     @Override
     public VoidOutput run(RunContext runContext) throws Exception {
-        var path = runContext.render(to);
+        var path = runContext.render(to).as(String.class).orElseThrow();
         var workspace = workspaceClient(runContext);
 
-        try (InputStream in = runContext.storage().getFile(URI.create(runContext.render(from)));
+        try (InputStream in = runContext.storage().getFile(URI.create(runContext.render(from).as(String.class).orElseThrow()));
              OutputStream out = workspace.dbfs().getOutputStream(path)) {
             int size = IOUtils.copy(in, out);
             runContext.metric(Counter.of("file.size", size));
