@@ -1,6 +1,7 @@
 package io.kestra.plugin.databricks.dbfs;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.utils.IdUtils;
@@ -46,11 +47,11 @@ class UploadTest {
             .id(IdUtils.create())
             .type(Upload.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(TOKEN).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
             )
-            .host(HOST)
-            .from(source.toString())
-            .to("/Share/test.txt")
+            .host(Property.of(HOST))
+            .from(Property.of(source.toString()))
+            .to(Property.of("/Share/test.txt"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

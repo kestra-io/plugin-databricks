@@ -2,11 +2,12 @@ package io.kestra.plugin.databricks.sql;
 
 import com.databricks.client.jdbc.Driver;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
@@ -73,7 +74,7 @@ import jakarta.validation.constraints.NotNull;
     description = """
         See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
         We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
-        
+
         Due to current limitation of the JDBC driver with Java 21, Arrow is disabled, performance may be impacted, see [here](https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370) and [here](https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297) from Databricks status on Java 21 support.
         """
 )
@@ -81,59 +82,52 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     private static final ObjectMapper MAPPER = JacksonMapper.ofIon();
 
     @NotNull
-    @PluginProperty(dynamic = true)
     @Schema(title = "Databricks host.")
-    private String host;
+    private Property<String> host;
 
     @NotNull
-    @PluginProperty(dynamic = true)
     @Schema(
         title = "Databricks cluster HTTP Path.",
         description = "To retrieve the HTTP Path, go to your Databricks cluster, click on Advanced options then, click on JDBC/ODBC. See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url) for more details."
     )
-    private String httpPath;
+    private Property<String> httpPath;
 
-    @PluginProperty(dynamic = true)
-    private String catalog;
+    private Property<String> catalog;
 
-    @PluginProperty(dynamic = true)
-    private String schema;
+    private Property<String> schema;
 
-    @PluginProperty(dynamic = true)
     @Schema(title = "Databricks access token.")
-    private String accessToken;
+    private Property<String> accessToken;
 
-    @PluginProperty
-    private Map<String, String> properties;
+    private Property<Map<String, String>> properties;
 
     @NotNull
-    @PluginProperty(dynamic = true)
     @Schema(title = "SQL query to be executed.")
-    private String sql;
+    private Property<String> sql;
 
     @Schema(
         title = "The time zone id to use for date/time manipulation. Default value is the worker default zone id."
     )
-    @PluginProperty
-    private String timeZoneId;
+    private Property<String> timeZoneId;
 
     //TODO should we allow to fetch or do we design only for big data ?
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        var url = "jdbc:databricks://" + runContext.render(host) + ":443;HttpPath=" + runContext.render(httpPath);
+        var url = "jdbc:databricks://" + runContext.render(host).as(String.class).orElseThrow() + ":443;HttpPath=" + runContext.render(httpPath).as(String.class).orElseThrow();
         if (catalog != null) {
-            url += ";ConnCatalog=" + runContext.render(catalog);
+            url += ";ConnCatalog=" + runContext.render(catalog).as(String.class).orElseThrow();
         }
         if (schema != null) {
-            url += ";ConnSchema=" + runContext.render(schema);
+            url += ";ConnSchema=" + runContext.render(schema).as(String.class).orElseThrow();
         }
         var props = new java.util.Properties();
         if (accessToken != null) {
-            props.put("PWD", runContext.render(accessToken));
+            props.put("PWD", runContext.render(accessToken).as(String.class).orElseThrow());
         }
-        if (properties != null) {
-            props.putAll(properties);
+        var propertiesValue = runContext.render(properties).asMap(String.class, String.class);
+        if (!propertiesValue.isEmpty()) {
+            props.putAll(propertiesValue);
         }
         // see https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370 and https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297
         // the JDBC driver is not compatible with Java 21 due to using a very old Arrow library
@@ -146,14 +140,14 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         DriverManager.registerDriver(new Driver());
         try (var connection = DriverManager.getConnection(url, props);
              var stmt = connection.createStatement()) {
-            var query = runContext.render(sql);
+            String query = runContext.render(sql).as(String.class).orElseThrow();
             runContext.logger().debug("Starting query: {}", query);
 
             if (stmt.execute(query)) {
                 try (ResultSet rs = stmt.getResultSet()) {
                     File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
                     BufferedWriter fileWriter = new BufferedWriter(new FileWriter(tempFile));
-                    long size = fetchToFile(stmt, rs, fileWriter, new DatabricksCellConverter(zoneId()), connection);
+                    long size = fetchToFile(stmt, rs, fileWriter, new DatabricksCellConverter(zoneId(runContext)), connection);
                     fileWriter.flush();
                     fileWriter.close();
 
@@ -170,9 +164,9 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     }
 
     //FIXME duplicated with io.kestra.plugin.jdbc.AbstractJdbcQuery
-    private ZoneId zoneId() {
+    private ZoneId zoneId(RunContext runContext) throws IllegalVariableEvaluationException {
         if (this.getTimeZoneId() != null) {
-            return ZoneId.of(this.getTimeZoneId());
+            return ZoneId.of(runContext.render(this.getTimeZoneId()).as(String.class).orElseThrow());
         }
 
         return TimeZone.getDefault().toZoneId();

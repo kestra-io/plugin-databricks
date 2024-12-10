@@ -4,6 +4,7 @@ import com.databricks.sdk.service.jobs.SubmitTask;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
@@ -56,13 +57,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 })
 @Schema(title = "Submit a Databricks run. Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion.")
 public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
-    @PluginProperty(dynamic = true)
     @Schema(title = "The name of the run.")
-    private String runName;
+    private Property<String> runName;
 
-    @PluginProperty
     @Schema(title = "If set, the task will wait for the run completion.")
-    private Duration waitForCompletion;
+    private Property<Duration> waitForCompletion;
 
     @NotNull
     @NotEmpty
@@ -92,7 +91,7 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
 
         var response = workspaceClient.jobs().submit(new com.databricks.sdk.service.jobs.SubmitRun()
             .setTasks(tasks)
-            .setRunName(runContext.render(runName)))
+            .setRunName(runContext.render(runName).as(String.class).orElse(null)))
             .getResponse();
 
         var run = workspaceClient.jobs().getRun(response.getRunId());
@@ -100,8 +99,9 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
         runContext.logger().info("Run submitted: {}", runURI);
 
         if (waitForCompletion != null) {
-            runContext.logger().info("Waiting for run to be terminated or skipped for {}", waitForCompletion);
-            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(response.getRunId(), waitForCompletion, null);
+            var time = runContext.render(waitForCompletion).as(Duration.class).orElseThrow();
+            runContext.logger().info("Waiting for run to be terminated or skipped for {}", time);
+            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(response.getRunId(), time, null);
             //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
 //            runContext.logger().info(workspaceClient.jobs().getRunOutput(response.getRunId()).getLogs());
             //TODO when finished, we have a lot of info that we can send as outputs and metrics

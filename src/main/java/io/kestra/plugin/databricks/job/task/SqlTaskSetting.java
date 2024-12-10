@@ -4,6 +4,7 @@ import com.databricks.sdk.service.jobs.SqlTask;
 import com.databricks.sdk.service.jobs.SqlTaskQuery;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -14,11 +15,9 @@ import java.util.Map;
 @Builder
 @Getter
 public class SqlTaskSetting {
-    @PluginProperty(dynamic = true)
-    private String warehouseId;
+    private Property<String> warehouseId;
 
-    @PluginProperty(dynamic = true)
-    private String queryId;
+    private Property<String> queryId;
 
     @PluginProperty(dynamic = true, additionalProperties = String.class)
     @Schema(
@@ -32,8 +31,8 @@ public class SqlTaskSetting {
         Map<String, String> renderedParameters = ParametersUtils.mapParameters(runContext, parameters);
 
         return new SqlTask()
-            .setWarehouseId(runContext.render(warehouseId))
+            .setWarehouseId(runContext.render(warehouseId).as(String.class).orElse(null))
             .setParameters(renderedParameters)
-            .setQuery(new SqlTaskQuery().setQueryId(runContext.render(queryId)));
+            .setQuery(new SqlTaskQuery().setQueryId(runContext.render(queryId).as(String.class).orElse(null)));
     }
 }

@@ -2,6 +2,7 @@ package io.kestra.plugin.databricks.job;
 
 import com.databricks.sdk.service.jobs.Source;
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -34,9 +35,9 @@ class SubmitRunTest {
             .id(IdUtils.create())
             .type(SubmitRun.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(TOKEN).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
             )
-            .host(HOST)
+            .host(Property.of(HOST))
             .runTasks(
                 List.of(
                     SubmitRun.RunSubmitTaskSetting.builder()
@@ -44,14 +45,14 @@ class SubmitRunTest {
                         .taskKey("taskKey")
                         .sparkPythonTask(
                             SparkPythonTaskSetting.builder()
-                                .sparkPythonTaskSource(Source.WORKSPACE)
-                                .pythonFile("/Shared/hello.py")
+                                .sparkPythonTaskSource(Property.of(Source.WORKSPACE))
+                                .pythonFile(Property.of("/Shared/hello.py"))
                                 .build()
                         )
                         .build()
                 )
             )
-            .waitForCompletion(Duration.ofMinutes(5))
+            .waitForCompletion(Property.of(Duration.ofMinutes(5)))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

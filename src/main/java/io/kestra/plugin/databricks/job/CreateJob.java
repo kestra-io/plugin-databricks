@@ -4,6 +4,7 @@ import com.databricks.sdk.service.jobs.Task;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
@@ -39,7 +40,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                 id: databricks_job_create
                 namespace: company.team
 
-                tasks:  
+                tasks:
                   - id: create_job
                     type: io.kestra.plugin.databricks.job.CreateJob
                     authentication:
@@ -58,13 +59,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 )
 @Schema(title = "Create a Databricks job and run it. Set `waitForCompletion` to the desired maximum duration if you want the task to wait for the job completion (e.g., `PT1H` to wait up to one hour).")
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
-    @PluginProperty(dynamic = true)
     @Schema(title = "The name of the job.")
-    private String jobName;
+    private Property<String> jobName;
 
-    @PluginProperty
     @Schema(title = "If set, the task will wait for the job run completion for up to the `waitForCompletion` duration before timing out.")
-    private Duration waitForCompletion;
+    private Property<Duration> waitForCompletion;
 
     @NotNull
     @NotEmpty
@@ -76,10 +75,10 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
     public Output run(RunContext runContext) throws Exception {
         List<Task> tasks = jobTasks.stream().map(throwFunction(
             setting -> new Task()
-                .setDescription(runContext.render(setting.description))
-                .setExistingClusterId(runContext.render(setting.existingClusterId))
-                .setTaskKey(runContext.render(setting.taskKey))
-                .setTimeoutSeconds(setting.timeoutSeconds)
+                .setDescription(runContext.render(setting.description).as(String.class).orElse(null))
+                .setExistingClusterId(runContext.render(setting.existingClusterId).as(String.class).orElse(null))
+                .setTaskKey(runContext.render(setting.taskKey).as(String.class).orElse(null))
+                .setTimeoutSeconds(runContext.render(setting.timeoutSeconds).as(Long.class).orElse(null))
                 .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
                 .setDbtTask(setting.dbtTask != null ? setting.dbtTask.toDbtTask(runContext) :  null)
                 .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
@@ -95,7 +94,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
 
         var workspaceClient = workspaceClient(runContext);
         var job = workspaceClient.jobs().create(new com.databricks.sdk.service.jobs.CreateJob()
-            .setName(runContext.render(jobName))
+            .setName(runContext.render(jobName).as(String.class).orElseThrow())
             .setTasks(tasks)
         );
         var jobURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId());
@@ -106,8 +105,9 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         runContext.logger().info("Run submitted: {}", run.getRunId());
 
         if (waitForCompletion != null) {
-            runContext.logger().info("Waiting for job to be terminated or skipped for {}", waitForCompletion);
-            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(run.getRunId(), waitForCompletion, null);
+            var waitTime = runContext.render(waitForCompletion).as(Duration.class).orElseThrow();
+            runContext.logger().info("Waiting for job to be terminated or skipped for {}", waitTime);
+            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(run.getRunId(), waitTime, null);
             //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
 //            runContext.logger().info(workspaceClient.jobs().getRunOutput(run.getRunId()).getLogs());
             //TODO when finished, we have a lot of info that we can send as outputs and metrics
@@ -122,21 +122,17 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
     @Builder
     @Getter
     public static class JobTaskSetting {
-        @PluginProperty(dynamic = true)
         @Schema(title = "Task description.")
-        private String description;
+        private Property<String> description;
 
-        @PluginProperty(dynamic = true)
         @Schema(title = "The identifier of the cluster.")
-        private String existingClusterId;
+        private Property<String> existingClusterId;
 
-        @PluginProperty(dynamic = true)
         @Schema(title = "Task key.")
-        private String taskKey;
+        private Property<String> taskKey;
 
-        @PluginProperty
         @Schema(title = "Task timeout in seconds.")
-        private Long timeoutSeconds;
+        private Property<Long> timeoutSeconds;
 
         @PluginProperty
         @Schema(title = "Notebook task settings.")

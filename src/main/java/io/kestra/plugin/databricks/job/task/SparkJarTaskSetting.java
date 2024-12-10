@@ -3,6 +3,7 @@ package io.kestra.plugin.databricks.job.task;
 import com.databricks.sdk.service.jobs.SparkJarTask;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -13,11 +14,9 @@ import java.util.List;
 @Builder
 @Getter
 public class SparkJarTaskSetting {
-    @PluginProperty(dynamic = true)
-    private String jarUri;
+    private Property<String> jarUri;
 
-    @PluginProperty(dynamic = true)
-    private String mainClassName;
+    private Property<String> mainClassName;
 
     @PluginProperty(dynamic = true)
     @Schema(
@@ -31,8 +30,8 @@ public class SparkJarTaskSetting {
         List<String> renderedParameters = ParametersUtils.listParameters(runContext, parameters);
 
         return new SparkJarTask()
-            .setJarUri(runContext.render(jarUri))
-            .setMainClassName(runContext.render(mainClassName))
+            .setJarUri(runContext.render(jarUri).as(String.class).orElse(null))
+            .setMainClassName(runContext.render(mainClassName).as(String.class).orElse(null))
             .setParameters(renderedParameters);
     }
 }

@@ -1,6 +1,7 @@
 package io.kestra.plugin.databricks.cluster;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -29,10 +30,10 @@ class DeleteClusterTest {
             .id(IdUtils.create())
             .type(DeleteCluster.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(TOKEN).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
             )
-            .host(HOST)
-            .clusterId(CLUSTER_ID)
+            .host(Property.of(HOST))
+            .clusterId(Property.of(CLUSTER_ID))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

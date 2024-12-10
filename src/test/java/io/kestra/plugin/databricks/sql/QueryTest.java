@@ -1,6 +1,7 @@
 package io.kestra.plugin.databricks.sql;
 
 import com.google.common.collect.ImmutableMap;
+import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
@@ -27,10 +28,10 @@ class QueryTest {
         var task = Query.builder()
             .id(IdUtils.create())
             .type(Query.class.getName())
-            .accessToken(TOKEN)
-            .host(HOST)
-            .httpPath(HTTP_PATH)
-            .sql("SELECT 1")
+            .accessToken(Property.of(TOKEN))
+            .host(Property.of(HOST))
+            .httpPath(Property.of(HTTP_PATH))
+            .sql(Property.of("SELECT 1"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
