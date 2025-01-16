@@ -67,7 +67,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
 
     @NotNull
     @NotEmpty
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     @Schema(title = "The job tasks, if multiple tasks are defined you must set `dependsOn` on each task.")
     private List<JobTaskSetting> jobTasks;
 
@@ -134,47 +134,47 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         @Schema(title = "Task timeout in seconds.")
         private Property<Long> timeoutSeconds;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Notebook task settings.")
         private NotebookTaskSetting notebookTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "DBT task settings.")
         private DbtTaskSetting dbtTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Spark Submit task settings.")
         private SparkSubmitTaskSetting sparkSubmitTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "SQL task settings.")
         private SqlTaskSetting sqlTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Spark JAR task settings.")
         private SparkJarTaskSetting sparkJarTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Spark Python task settings.")
         private SparkPythonTaskSetting sparkPythonTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Python Wheel task settings.")
         private PythonWheelTaskSetting pythonWheelTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Pipeline task settings.")
         private PipelineTaskSetting pipelineTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Run job task settings.")
         private RunJobTaskSetting runJobTask;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Task dependencies, set this if multiple tasks are defined on the job.")
         private List<String> dependsOn;
 
-        @PluginProperty
+        @PluginProperty(dynamic = true)
         @Schema(title = "Task libraries.")
         private List<LibrarySetting> libraries;
     }

@@ -34,7 +34,7 @@ public abstract class AbstractTask extends Task {
     @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one.")
     private Property<String> configFile;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     @Schema(
         title = "Databricks authentication configuration.",
         description = """
