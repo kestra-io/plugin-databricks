@@ -16,17 +16,17 @@ import java.util.List;
 @Builder
 @Getter
 public class LibrarySetting {
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private CranSetting cran;
 
     private Property<String> egg;
 
     private Property<String> jar;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private MavenSetting maven;
 
-    @PluginProperty
+    @PluginProperty(dynamic = true)
     private PypiSetting pypi;
 
     private Property<String> whl;
