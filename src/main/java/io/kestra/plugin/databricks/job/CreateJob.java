@@ -44,8 +44,8 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                   - id: create_job
                     type: io.kestra.plugin.databricks.job.CreateJob
                     authentication:
-                      token: <your-token>
-                    host: <your-host>
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
+                    host: "{{ secret('DATABRICKS_HOST') }}"
                     jobTasks:
                       - existingClusterId: <your-cluster>
                         taskKey: taskKey

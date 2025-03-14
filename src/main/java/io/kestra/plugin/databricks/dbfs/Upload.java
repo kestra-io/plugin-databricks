@@ -46,10 +46,10 @@ import jakarta.validation.constraints.NotNull;
                   - id: upload_file
                     type: io.kestra.plugin.databricks.dbfs.Upload
                     authentication:
-                      token: <your-token>
-                    host: <your-host>
+                    token: "{{ secret('DATABRICKS_TOKEN') }}"
+                    host: "{{ secret('DATABRICKS_HOST') }}"
                     from: "{{ inputs.file }}"
-                    to: /Share/myFile.txt
+                    to: /Share/myFile.parquet
                 """
         )
     },
