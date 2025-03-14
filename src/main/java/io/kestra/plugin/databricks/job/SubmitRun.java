@@ -42,12 +42,12 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             tasks:
               - id: submit_run
                 type: io.kestra.plugin.databricks.job.SubmitRun
+                host: "{{ secret('DATABRICKS_HOST') }}"
                 authentication:
-                  token: <your-token>
-                host: <your-host>
+                  token: "{{ secret('DATABRICKS_TOKEN') }}"
                 runTasks:
                   - existingClusterId: <your-cluster>
-                    taskKey: taskKey
+                    taskKey: pysparkTask
                     sparkPythonTask:
                       pythonFile: /Shared/hello.py
                       sparkPythonTaskSource: WORKSPACE
