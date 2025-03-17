@@ -129,12 +129,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         if (!propertiesValue.isEmpty()) {
             props.putAll(propertiesValue);
         }
-        // see https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370 and https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297
-        // the JDBC driver is not compatible with Java 21 due to using a very old Arrow library
-        // as long as it's the case, we disable arrow by default (except if someone already set the 'EnableArrow' property
-        if (!props.contains("EnableArrow")) {
-            props.put("EnableArrow", "0");
-        }
+
         runContext.logger().debug("Using JDBC URL: {}", url);
 
         DriverManager.registerDriver(new Driver());
