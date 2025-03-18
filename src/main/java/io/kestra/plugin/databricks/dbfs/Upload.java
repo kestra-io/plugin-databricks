@@ -71,6 +71,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         description = "Must be a file from Kestra internal storage."
     )
     @NotNull
+    @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Schema(
