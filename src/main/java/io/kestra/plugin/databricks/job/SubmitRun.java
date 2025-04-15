@@ -55,7 +55,10 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
             """
     )
 })
-@Schema(title = "Submit a Databricks run. Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion.")
+@Schema(
+    title = "Submit a Databricks run.",
+    description = "Optionally, set `waitForCompletion` to a desired maximum duration to wait for the run completion."
+)
 public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @Schema(title = "The name of the run.")
     private Property<String> runName;

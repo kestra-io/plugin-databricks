@@ -57,7 +57,10 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
         )
     }
 )
-@Schema(title = "Create a Databricks job and run it. Set `waitForCompletion` to the desired maximum duration if you want the task to wait for the job completion (e.g., `PT1H` to wait up to one hour).")
+@Schema(
+    title = "Create a Databricks job and run it.",
+    description = "Set `waitForCompletion` to the desired maximum duration if you want the task to wait for the job completion (e.g., `PT1H` to wait up to one hour)."
+)
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
     @Schema(title = "The name of the job.")
     private Property<String> jobName;
