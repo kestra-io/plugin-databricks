@@ -46,6 +46,7 @@ dependencies {
     // Kestra
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
+    compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Databricks deps
     api "com.databricks:databricks-sdk-java:0.42.0"
@@ -95,6 +96,7 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+    testImplementation group: "io.kestra", name: "script", version: kestraVersion
 }
 
 /**********************************************************************************************************************\
