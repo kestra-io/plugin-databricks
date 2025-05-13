@@ -8,9 +8,7 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import jakarta.inject.Inject;
-import lombok.Getter;
 import org.assertj.core.util.Strings;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 
@@ -25,7 +23,7 @@ import static org.hamcrest.Matchers.is;
     value = "canNotBeEnabled",
     disabledReason = "Disabled for CI/CD as requires secrets data, such as: host, token, httpPath"
 )
-public class DatabricksCLITest {
+public class DatabricksSQLCLITest {
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -33,9 +31,9 @@ public class DatabricksCLITest {
     @Test
     void run() throws Exception {
 
-        var databricksCLI = DatabricksCLI.builder()
+        var databricksSQLCLI = DatabricksSQLCLI.builder()
             .id(IdUtils.create())
-            .type(DatabricksCLI.class.getName())
+            .type(DatabricksSQLCLI.class.getName())
             .host(Property.of(getHost()))
             .token(Property.of(getToken()))
             .httpPath(Property.of(getHttpPath()))
@@ -43,9 +41,9 @@ public class DatabricksCLITest {
                 Property.of(List.of("dbsqlcli")))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, databricksCLI, Map.of());
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, databricksSQLCLI, Map.of());
 
-        ScriptOutput output = databricksCLI.run(runContext);
+        ScriptOutput output = databricksSQLCLI.run(runContext);
 
         assertThat(output.getExitCode(), is(0));
     }

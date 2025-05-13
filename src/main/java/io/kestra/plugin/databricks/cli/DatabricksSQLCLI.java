@@ -3,7 +3,6 @@ package io.kestra.plugin.databricks.cli;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.*;
 import io.kestra.core.models.tasks.runners.TaskRunner;
@@ -23,7 +22,6 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
 @SuperBuilder
 @ToString
@@ -33,7 +31,7 @@ import java.util.stream.Stream;
 @Plugin(
     examples = {
         @Example(
-            title = "Execute a SQL query using Databricks CLI",
+            title = "Execute a SQL query using Databricks SQL CLI",
             full = true,
             code = """
                 id: databricks_cli_query
@@ -41,7 +39,7 @@ import java.util.stream.Stream;
 
                 tasks:
                   - id: run_sql_query
-                    type: io.kestra.plugin.databricks.cli.DatabricksCLI
+                    type: io.kestra.plugin.databricks.cli.DatabricksSQLCLI
                     host: "{{ secret('DATABRICKS_HOST') }}"
                     token: "{{ secret('DATABRICKS_TOKEN') }}"
                     httpPath: "{{ secret('DATABRICKS_HTTP_PATH') }}"
@@ -55,7 +53,7 @@ import java.util.stream.Stream;
     title = "Execute SQL using Databricks SQL CLI",
     description = "This task allows you to execute SQL commands using the Databricks SQL CLI."
 )
-public class DatabricksCLI extends Task implements RunnableTask<ScriptOutput>, NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
+public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>, NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
 
     public static final String DEFAULT_IMAGE = "ghcr.io/kestra-io/databricks-sql-cli";
 
