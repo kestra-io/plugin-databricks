@@ -31,7 +31,7 @@ import java.util.Map;
 @Plugin(
     examples = {
         @Example(
-            title = "Execute a SQL query using Databricks SQL CLI",
+            title = "Execute a SQL query using Databricks SQL CLI.",
             full = true,
             code = """
                 id: databricks_cli_query
@@ -50,7 +50,7 @@ import java.util.Map;
     }
 )
 @Schema(
-    title = "Execute SQL using Databricks SQL CLI",
+    title = "Execute SQL using Databricks SQL CLI.",
     description = "This task allows you to execute SQL commands using the Databricks SQL CLI."
 )
 public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>, NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
