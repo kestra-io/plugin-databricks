@@ -48,11 +48,11 @@ class UploadTest {
             .id(IdUtils.create())
             .type(Upload.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
-            .from(Property.of(source.toString()))
-            .to(Property.of("/Share/test.txt"))
+            .host(Property.ofValue(HOST))
+            .from(Property.ofValue(source.toString()))
+            .to(Property.ofValue("/Share/test.txt"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

@@ -35,9 +35,9 @@ class SubmitRunTest {
             .id(IdUtils.create())
             .type(SubmitRun.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
+            .host(Property.ofValue(HOST))
             .runTasks(
                 List.of(
                     SubmitRun.RunSubmitTaskSetting.builder()
@@ -45,14 +45,14 @@ class SubmitRunTest {
                         .taskKey("taskKey")
                         .sparkPythonTask(
                             SparkPythonTaskSetting.builder()
-                                .sparkPythonTaskSource(Property.of(Source.WORKSPACE))
-                                .pythonFile(Property.of("/Shared/hello.py"))
+                                .sparkPythonTaskSource(Property.ofValue(Source.WORKSPACE))
+                                .pythonFile(Property.ofValue("/Shared/hello.py"))
                                 .build()
                         )
                         .build()
                 )
             )
-            .waitForCompletion(Property.of(Duration.ofMinutes(5)))
+            .waitForCompletion(Property.ofValue(Duration.ofMinutes(5)))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

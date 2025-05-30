@@ -28,10 +28,10 @@ class QueryTest {
         var task = Query.builder()
             .id(IdUtils.create())
             .type(Query.class.getName())
-            .accessToken(Property.of(TOKEN))
-            .host(Property.of(HOST))
-            .httpPath(Property.of(HTTP_PATH))
-            .sql(Property.of("SELECT 1"))
+            .accessToken(Property.ofValue(TOKEN))
+            .host(Property.ofValue(HOST))
+            .httpPath(Property.ofValue(HTTP_PATH))
+            .sql(Property.ofValue("SELECT 1"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

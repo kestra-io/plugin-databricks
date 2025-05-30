@@ -30,10 +30,10 @@ class DeleteClusterTest {
             .id(IdUtils.create())
             .type(DeleteCluster.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
-            .clusterId(Property.of(CLUSTER_ID))
+            .host(Property.ofValue(HOST))
+            .clusterId(Property.ofValue(CLUSTER_ID))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());

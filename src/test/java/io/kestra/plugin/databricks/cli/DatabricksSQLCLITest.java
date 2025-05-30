@@ -34,11 +34,11 @@ public class DatabricksSQLCLITest {
         var databricksSQLCLI = DatabricksSQLCLI.builder()
             .id(IdUtils.create())
             .type(DatabricksSQLCLI.class.getName())
-            .host(Property.of(getHost()))
-            .token(Property.of(getToken()))
-            .httpPath(Property.of(getHttpPath()))
+            .host(Property.ofValue(getHost()))
+            .token(Property.ofValue(getToken()))
+            .httpPath(Property.ofValue(getHttpPath()))
             .commands(
-                Property.of(List.of("dbsqlcli")))
+                Property.ofValue(List.of("dbsqlcli")))
             .build();
 
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, databricksSQLCLI, Map.of());

@@ -100,7 +100,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
     @Schema(title = "The task runner container image, only used if the task runner is container-based.")
     @Builder.Default
-    private Property<String> containerImage = Property.of(DEFAULT_IMAGE);
+    private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(
         title = "Deprecated, use 'taskRunner' instead"
@@ -124,8 +124,8 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
             .withTaskRunner(this.taskRunner)
             .withDockerOptions(injectDefaults(this.getDocker()))
             .withContainerImage("databricks-sql-cli")
-            .withInterpreter(Property.of(List.of("/bin/sh", "-c")))
-            .withCommands(Property.of(databricksCommand))
+            .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
+            .withCommands(Property.ofValue(databricksCommand))
             .withInputFiles(inputFiles)
             .withOutputFiles(renderedOutputFiles.isEmpty() ? null : renderedOutputFiles)
             .run();

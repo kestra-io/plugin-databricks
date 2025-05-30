@@ -30,10 +30,10 @@ class DownloadTest {
             .id(IdUtils.create())
             .type(Upload.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
-            .from(Property.of("/Share/test.txt"))
+            .host(Property.ofValue(HOST))
+            .from(Property.ofValue("/Share/test.txt"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
