@@ -21,47 +21,39 @@ import static org.hamcrest.Matchers.is;
 @KestraTest
 @DisabledIf(
     value = "canNotBeEnabled",
-    disabledReason = "Disabled for CI/CD as requires secrets data, such as: host, token, httpPath"
+    disabledReason = "Disabled for CI/CD as requires secrets data: host, token"
 )
-public class DatabricksSQLCLITest {
+public class DatabricksCLITest {
 
     @Inject
     private RunContextFactory runContextFactory;
 
     @Test
     void run() throws Exception {
-
-        var databricksSQLCLI = DatabricksSQLCLI.builder()
+        var databricksCLI = DatabricksCLI.builder()
             .id(IdUtils.create())
-            .type(DatabricksSQLCLI.class.getName())
-            .host(Property.ofValue(getHost()))
-            .token(Property.ofValue(getToken()))
-            .httpPath(Property.ofValue(getHttpPath()))
-            .commands(
-                Property.ofValue(List.of("dbsqlcli")))
+            .type(DatabricksCLI.class.getName())
+            .databricksHost(Property.ofValue(getHost()))
+            .databricksToken(Property.ofValue(getToken()))
+            .commands(Property.ofValue(List.of("databricks clusters list")))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, databricksSQLCLI, Map.of());
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, databricksCLI, Map.of());
 
-        ScriptOutput output = databricksSQLCLI.run(runContext);
+        ScriptOutput output = databricksCLI.run(runContext);
 
         assertThat(output.getExitCode(), is(0));
     }
 
     protected static boolean canNotBeEnabled() {
-        return Strings.isNullOrEmpty(getHost()) || Strings.isNullOrEmpty(getToken()) || Strings.isNullOrEmpty(getHttpPath());
+        return Strings.isNullOrEmpty(getHost()) || Strings.isNullOrEmpty(getToken());
     }
 
     protected static String getHost() {
-        return "";
+        return System.getenv("DATABRICKS_HOST");
     }
 
     protected static String getToken() {
-        return "";
-    }
-
-    protected static String getHttpPath() {
-        return "";
+        return System.getenv("DATABRICKS_TOKEN");
     }
 }
-
