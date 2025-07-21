@@ -37,8 +37,8 @@ import java.util.List;
 
                 tasks:
                   - id: list_clusters
-                    type: io.kestra.plugin.databricks.cli.Commands
-                    databricksToken: ${{ secrets.DATABRICKS_TOKEN }}
+                    type: io.kestra.plugin.databricks.cli.DatabricksCLI
+                    databricksToken: "{{ secret('DATABRICKS_TOKEN') }}"
                     databricksHost: "https://<your-instance>.cloud.databricks.com"
                     commands:
                       - databricks clusters list
@@ -57,12 +57,11 @@ import java.util.List;
 
                 tasks:
                   - id: run_job
-                    type: io.kestra.plugin.databricks.cli.Commands
+                    type: io.kestra.plugin.databricks.cli.DatabricksCLI
                     databricksToken: "{{ secret('DATABRICKS_TOKEN') }}"
                     databricksHost: "https://<your-instance>.cloud.databricks.com"
                     commands:
                       - databricks jobs run-now {{ inputs.jobId }} > files.txt
-
                 """
         )
     }
