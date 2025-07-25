@@ -1,5 +1,6 @@
 package io.kestra.plugin.databricks.job;
 
+import com.databricks.sdk.service.jobs.RunNow;
 import com.databricks.sdk.service.jobs.Task;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -103,7 +104,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         var jobURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId());
         runContext.logger().info("Job created: {}", jobURI);
 
-        var run = workspaceClient.jobs().runNow(job.getJobId()).get();
+        var run = workspaceClient.jobs().runNow(new RunNow().setJobId(job.getJobId())).get();
         var runURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId() + "/run/" + run.getRunId());
         runContext.logger().info("Run submitted: {}", run.getRunId());
 
