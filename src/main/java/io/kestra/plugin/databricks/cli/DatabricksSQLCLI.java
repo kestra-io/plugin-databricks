@@ -91,7 +91,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
     private Property<Map<String, String>> options;
 
     @Schema(
-        title = "The task runner to use.",
+        title = "The task runner to use",
         description = "Task runners are provided by plugins, each have their own properties."
     )
     @Builder.Default
