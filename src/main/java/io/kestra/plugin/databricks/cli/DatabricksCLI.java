@@ -72,15 +72,15 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
     @Builder.Default
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
-    @Schema(title = "Databricks CLI commands to execute.")
+    @Schema(title = "Databricks CLI commands to execute")
     @NotNull
     protected Property<List<String>> commands;
 
-    @Schema(title = "Databricks host URL (e.g. https://<instance>.cloud.databricks.com).")
+    @Schema(title = "Databricks host URL (e.g., https://<instance>.cloud.databricks.com)")
     @NotNull
     protected Property<String> databricksHost;
 
-    @Schema(title = "Databricks personal access token.")
+    @Schema(title = "Databricks personal access token")
     @NotNull
     protected Property<String> databricksToken;
 
