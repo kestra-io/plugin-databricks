@@ -7,7 +7,6 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.databricks.AbstractDatabricksTest;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.SparkPythonTaskSetting;
 import io.kestra.core.junit.annotations.KestraTest;
@@ -23,15 +22,13 @@ import static org.hamcrest.Matchers.notNullValue;
 
 @KestraTest
 @DisabledIf(
-    value = "isClusterIdConfigured",
-    disabledReason = "Cluster ID missing"
+    value = "canNotBeEnabled",
+    disabledReason = "Disabled because it requires Databricks secrets: host, token, clusterId"
 )
-class SubmitRunTest extends AbstractDatabricksTest {
+class SubmitRunTest {
     protected static final String CLUSTER_ID = System.getenv("DATABRICKS_CLUSTER_ID");
-
-    protected static boolean isClusterIdConfigured() {
-        return Strings.isNullOrEmpty(CLUSTER_ID);
-    }
+    protected static final String HOST = System.getenv("DATABRICKS_HOST");
+    protected static final String TOKEN = System.getenv("DATABRICKS_TOKEN");
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -65,5 +62,9 @@ class SubmitRunTest extends AbstractDatabricksTest {
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output.getRunId(), notNullValue());
+    }
+
+    protected static boolean canNotBeEnabled() {
+        return Strings.isNullOrEmpty(HOST) || Strings.isNullOrEmpty(TOKEN) || Strings.isNullOrEmpty(CLUSTER_ID) ;
     }
 }

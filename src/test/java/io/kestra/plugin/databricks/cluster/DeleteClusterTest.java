@@ -1,21 +1,29 @@
 package io.kestra.plugin.databricks.cluster;
 
+import com.google.api.client.util.Strings;
 import com.google.common.collect.ImmutableMap;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.databricks.AbstractDatabricksTest;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 @KestraTest
-class DeleteClusterTest extends AbstractDatabricksTest {
+@DisabledIf(
+    value = "canNotBeEnabled",
+    disabledReason = "Disabled because it requires Databricks secrets: host, token"
+)
+class DeleteClusterTest {
+    protected static final String HOST = System.getenv("DATABRICKS_HOST");
+    protected static final String TOKEN = System.getenv("DATABRICKS_TOKEN");
+
     @Inject
     private RunContextFactory runContextFactory;
 
@@ -57,5 +65,9 @@ class DeleteClusterTest extends AbstractDatabricksTest {
         var deleteOutput = deleteTask.run(deleteContext);
 
         assertThat(deleteOutput, nullValue());
+    }
+
+    protected static boolean canNotBeEnabled() {
+        return Strings.isNullOrEmpty(HOST) || Strings.isNullOrEmpty(TOKEN);
     }
 }
