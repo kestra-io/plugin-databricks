@@ -7,10 +7,10 @@ import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.databricks.AbstractDatabricksTest;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -22,11 +22,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 
 @KestraTest
-@Disabled("Need an account to work")
-class UploadTest {
-    private static final String TOKEN = "";
-    private static final String HOST = "";
-
+class UploadTest extends AbstractDatabricksTest {
     @Inject
     private RunContextFactory runContextFactory;
 
