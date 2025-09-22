@@ -12,7 +12,6 @@ import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.SparkPythonTaskSetting;
 import io.kestra.core.junit.annotations.KestraTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 
