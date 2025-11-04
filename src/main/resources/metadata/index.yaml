@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks
+name: "databricks"
+title: "Databricks"
+description: "Databricks plugin for Kestra"
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
