@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.dbfs
+name: "dbfs"
+title: "DBFS"
+description: "This subgroup of plugins contains tasks for managing files on the Databricks File System (DBFS)."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
