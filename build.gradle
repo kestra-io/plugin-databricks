@@ -51,7 +51,7 @@ dependencies {
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Databricks deps
-    api "com.databricks:databricks-sdk-java:0.67.3"
+    api "com.databricks:databricks-sdk-java:0.69.0"
     api "com.databricks:databricks-jdbc:3.0.1"
 }
 
