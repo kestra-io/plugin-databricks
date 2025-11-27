@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.job
+name: "job"
+title: "Job"
+description: "This sub-group of plugins contains tasks for launching jobs on a Databricks cluster."
+body: ""
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
