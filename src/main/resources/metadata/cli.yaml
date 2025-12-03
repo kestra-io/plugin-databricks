@@ -1,8 +1,8 @@
 group: io.kestra.plugin.databricks.cli
 name: "cli"
 title: "CLI"
-description: "This sub-group of plugins contains tasks for executing Databricks SQL CLI commands."
-body: ""
+description: "Tasks that execute Databricks CLI and SQL CLI commands through containerized tools."
+body: "Run administrative actions or quick queries with the Databricks CLI by supplying the workspace host, personal access token, and the CLI commands to execute, or target the SQL warehouse via the SQL CLI with host, token, HTTP path, and SQL statements. Ideal for scripting one-off operations, validating configurations, or orchestrating CLI-based workflows without managing the binaries yourself."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

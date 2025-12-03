@@ -1,8 +1,8 @@
 group: io.kestra.plugin.databricks.dbfs
 name: "dbfs"
 title: "DBFS"
-description: "This subgroup of plugins contains tasks for managing files on the Databricks File System (DBFS)."
-body: ""
+description: "Tasks that move files between Kestra and the Databricks File System (DBFS)."
+body: "Use these tasks to upload or download artifacts for your pipelines through DBFS using your Databricks host and token. Specify the source file from Kestra storage via `from` and the DBFS destination via `to`; downloads return a Kestra storage URI so the file can be reused downstream."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"
