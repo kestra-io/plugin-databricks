@@ -58,7 +58,7 @@ import jakarta.validation.constraints.NotNull;
                 tasks:
                   - id: sql_query
                     type: io.kestra.plugin.databricks.sql.Query
-                    accessToken: <your-accessToken>
+                    accessToken: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     httpPath: <your-httpPath>
                     sql: SELECT 1

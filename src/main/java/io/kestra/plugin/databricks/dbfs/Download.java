@@ -44,7 +44,7 @@ import jakarta.validation.constraints.NotNull;
                   - id: download_file
                     type: io.kestra.plugin.databricks.dbfs.Download
                     authentication:
-                      token: <your-token>
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     from: /Share/myFile.txt
                 """

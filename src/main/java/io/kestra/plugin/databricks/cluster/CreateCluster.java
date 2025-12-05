@@ -38,7 +38,7 @@ import jakarta.validation.constraints.NotNull;
                   - id: create_cluster
                     type: io.kestra.plugin.databricks.cluster.CreateCluster
                     authentication:
-                      token: <your-token>
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     clusterName: kestra-demo
                     nodeTypeId: n2-highmem-4
