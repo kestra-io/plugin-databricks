@@ -52,7 +52,7 @@ import java.util.Map;
 @Schema(
     title = "Execute SQL via Databricks SQL CLI",
     description = """
-        Runs SQL statements with dbsqlcli in a container (default ghcr.io/kestra-io/databricks-sql-cli).
+        Runs SQL statements with dbsqlcli in a container (default `ghcr.io/kestra-io/databricks-sql-cli`).
         Renders connection values and queries, then executes them sequentially; use outputFiles to persist CLI outputs.
         """
 )
