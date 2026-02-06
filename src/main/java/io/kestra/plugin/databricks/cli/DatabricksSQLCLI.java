@@ -90,7 +90,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
     @Schema(
         title = "Additional CLI options",
-        description = "Map of extra dbsqlcli flags appended to the command, e.g. --output json"
+        description = "Map of extra dbsqlcli flags appended to the command, e.g. `--output json`"
     )
     private Property<Map<String, String>> options;
 
