@@ -23,8 +23,11 @@ import java.util.List;
 @ToString
 @EqualsAndHashCode
 @Schema(
-    title = "Run Databricks CLI commands.",
-    description = "Executes any Databricks CLI command using the official Docker image."
+    title = "Run Databricks CLI commands",
+    description = """
+        Executes Databricks CLI statements inside the official CLI container (default `ghcr.io/databricks/cli:latest`).
+        Injects DATABRICKS_HOST and DATABRICKS_TOKEN as environment variables for each command.
+        """
 )
 @Plugin(
     examples = {
@@ -72,15 +75,15 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
     @Builder.Default
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
-    @Schema(title = "Databricks CLI commands to execute")
+    @Schema(title = "CLI commands to execute", description = "Commands run sequentially with host/token pre-set in the environment")
     @NotNull
     protected Property<List<String>> commands;
 
-    @Schema(title = "Databricks host URL (e.g., https://<instance>.cloud.databricks.com)")
+    @Schema(title = "Databricks host URL", description = "Workspace URL including protocol, e.g. https://<instance>.cloud.databricks.com")
     @NotNull
     protected Property<String> databricksHost;
 
-    @Schema(title = "Databricks personal access token")
+    @Schema(title = "Databricks personal access token", description = "PAT exported to DATABRICKS_TOKEN for each command; render from secrets")
     @NotNull
     protected Property<String> databricksToken;
 
