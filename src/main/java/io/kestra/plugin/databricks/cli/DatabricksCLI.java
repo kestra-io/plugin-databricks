@@ -25,7 +25,7 @@ import java.util.List;
 @Schema(
     title = "Run Databricks CLI commands",
     description = """
-        Executes Databricks CLI statements inside the official CLI container (default ghcr.io/databricks/cli:latest).
+        Executes Databricks CLI statements inside the official CLI container (default `ghcr.io/databricks/cli:latest`).
         Injects DATABRICKS_HOST and DATABRICKS_TOKEN as environment variables for each command.
         """
 )
