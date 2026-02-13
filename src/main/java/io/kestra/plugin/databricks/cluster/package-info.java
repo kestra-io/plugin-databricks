@@ -1,7 +1,7 @@
 @PluginSubGroup(
     title = "Cluster",
     description = "This sub-group of plugins contains tasks for managing Databricks clusters.",
-    categories = { PluginSubGroup.PluginCategory.TOOL, PluginSubGroup.PluginCategory.CLOUD }
+        categories = { PluginSubGroup.PluginCategory.DATA }
 )
 package io.kestra.plugin.databricks.cluster;
 
