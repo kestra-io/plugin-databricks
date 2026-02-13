@@ -62,20 +62,21 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Upload a file to the Databricks File System.",
-    description = "The file can be of any size. The task will upload the file in chunks of 1MB."
+    title = "Upload a file to DBFS",
+    description = "Streams a file from Kestra internal storage to DBFS using 1 MB chunks; suited for large files."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(
-        title = "The file to upload.",
-        description = "Must be a file from Kestra internal storage."
+        title = "Source file URI",
+        description = "Internal storage URI of the file to upload (kestra:// ...)"
     )
     @NotNull
     @PluginProperty(internalStorageURI = true)
     private Property<String> from;
 
     @Schema(
-        title = "The destination path."
+        title = "Destination DBFS path",
+        description = "Absolute DBFS path such as /mnt/volume/file.parquet"
     )
     @NotNull
     private Property<String> to;

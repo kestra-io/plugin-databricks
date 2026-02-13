@@ -50,8 +50,11 @@ import java.util.Map;
     }
 )
 @Schema(
-    title = "Execute SQL using Databricks SQL CLI.",
-    description = "This task allows you to execute SQL commands using the Databricks SQL CLI."
+    title = "Execute SQL via Databricks SQL CLI",
+    description = """
+        Runs SQL statements with dbsqlcli in a container (default `ghcr.io/kestra-io/databricks-sql-cli`).
+        Renders connection values and queries, then executes them sequentially; use outputFiles to persist CLI outputs.
+        """
 )
 public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>, NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
 
@@ -59,51 +62,53 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
     @Schema(
         title = "Databricks host",
-        description = "The Databricks workspace host URL"
+        description = "Workspace hostname for the SQL warehouse, without a trailing slash"
     )
     @NotNull
     private Property<String> host;
 
     @Schema(
         title = "Access token",
-        description = "Databricks personal access token for authentication"
+        description = "Databricks personal access token; render from secrets"
     )
     @NotNull
     private Property<String> token;
 
     @Schema(
         title = "HTTP path",
-        description = "The HTTP path to the Databricks SQL warehouse"
+        description = "HTTP path for the SQL warehouse (from workspace connection details)"
     )
     @NotNull
     private Property<String> httpPath;
 
     @Schema(
-        title = "SQL query",
-        description = "The SQL query to execute"
+        title = "SQL commands",
+        description = "One or more SQL statements rendered then executed in order with dbsqlcli"
     )
     @NotNull
     private Property<List<String>> commands;
 
     @Schema(
-        title = "Additional CLI options"
+        title = "Additional CLI options",
+        description = "Map of extra dbsqlcli flags appended to the command, e.g. `--output json`"
     )
     private Property<Map<String, String>> options;
 
     @Schema(
-        title = "The task runner to use",
-        description = "Task runners are provided by plugins, each have their own properties."
+        title = "Task runner",
+        description = "Execution backend; defaults to container-based runner"
     )
     @Builder.Default
     @Valid
     private TaskRunner<?> taskRunner = Docker.instance();
 
-    @Schema(title = "The task runner container image, only used if the task runner is container-based.")
+    @Schema(title = "Task runner container image", description = "Container image used when the task runner is Docker-based; default ghcr.io/kestra-io/databricks-sql-cli")
     @Builder.Default
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(
-        title = "Deprecated, use 'taskRunner' instead"
+        title = "Deprecated, use taskRunner instead",
+        description = "Legacy Docker options kept for backward compatibility; prefer taskRunner"
     )
     @Deprecated
     private DockerOptions docker;

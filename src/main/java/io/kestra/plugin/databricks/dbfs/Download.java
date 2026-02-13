@@ -59,12 +59,13 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Download a file from Databricks File System.",
-    description = "The file can be of any size. The task will download the file in chunks of 1MB."
+    title = "Download a file from DBFS",
+    description = "Streams a DBFS file to a temp file in Kestra internal storage using 1 MB chunks; returns the storage URI."
 )
 public class Download extends AbstractTask implements RunnableTask<Download.Output> {
     @Schema(
-        title = "The file to download."
+        title = "Source DBFS path",
+        description = "Absolute path to the DBFS file to download"
     )
     @NotNull
     private Property<String> from;
@@ -89,7 +90,8 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
     public static class Output implements io.kestra.core.models.tasks.Output {
 
         @Schema(
-            title = "The URI of the file downloaded to Kestra's internal storage."
+            title = "Downloaded file URI",
+            description = "Internal storage URI for the downloaded file"
         )
         private final URI uri;
     }

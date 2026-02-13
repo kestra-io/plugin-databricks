@@ -59,20 +59,23 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     }
 )
 @Schema(
-    title = "Create a Databricks job and run it.",
-    description = "Set `waitForCompletion` to the desired maximum duration if you want the task to wait for the job completion (e.g., `PT1H` to wait up to one hour)."
+    title = "Create and run a Databricks job",
+    description = """
+        Creates a Databricks job with one or more tasks, submits it immediately, and optionally waits for completion.
+        Use numWorkers/cluster settings inside each task; set waitForCompletion (ISO-8601 duration) to block until the run ends.
+        """
 )
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
-    @Schema(title = "The name of the job.")
+    @Schema(title = "Job name")
     private Property<String> jobName;
 
-    @Schema(title = "If set, the task will wait for the job run completion for up to the `waitForCompletion` duration before timing out.")
+    @Schema(title = "Wait for completion", description = "If set, waits up to the given duration (e.g., PT1H) for the submitted run to finish")
     private Property<Duration> waitForCompletion;
 
     @NotNull
     @NotEmpty
     @PluginProperty(dynamic = true)
-    @Schema(title = "The job tasks, if multiple tasks are defined you must set `dependsOn` on each task.")
+    @Schema(title = "Job tasks", description = "Task definitions; when multiple tasks are present, specify dependsOn for ordering")
     private List<JobTaskSetting> jobTasks;
 
     @Override
@@ -126,76 +129,76 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
     @Builder
     @Getter
     public static class JobTaskSetting {
-        @Schema(title = "Task description.")
+        @Schema(title = "Task description")
         private Property<String> description;
 
-        @Schema(title = "The identifier of the cluster.")
+        @Schema(title = "Existing cluster ID", description = "Cluster to reuse for this task; omit to use task-specific settings")
         private Property<String> existingClusterId;
 
-        @Schema(title = "Task key.")
+        @Schema(title = "Task key", description = "Unique key per task; required when multiple tasks are defined")
         private Property<String> taskKey;
 
-        @Schema(title = "Task timeout in seconds.")
+        @Schema(title = "Task timeout (seconds)")
         private Property<Long> timeoutSeconds;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Notebook task settings.")
+        @Schema(title = "Notebook task settings")
         private NotebookTaskSetting notebookTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "DBT task settings.")
+        @Schema(title = "DBT task settings")
         private DbtTaskSetting dbtTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Spark Submit task settings.")
+        @Schema(title = "Spark Submit task settings")
         private SparkSubmitTaskSetting sparkSubmitTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "SQL task settings.")
+        @Schema(title = "SQL task settings")
         private SqlTaskSetting sqlTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Spark JAR task settings.")
+        @Schema(title = "Spark JAR task settings")
         private SparkJarTaskSetting sparkJarTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Spark Python task settings.")
+        @Schema(title = "Spark Python task settings")
         private SparkPythonTaskSetting sparkPythonTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Python Wheel task settings.")
+        @Schema(title = "Python Wheel task settings")
         private PythonWheelTaskSetting pythonWheelTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Pipeline task settings.")
+        @Schema(title = "Pipeline task settings")
         private PipelineTaskSetting pipelineTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Run job task settings.")
+        @Schema(title = "Run job task settings")
         private RunJobTaskSetting runJobTask;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Task dependencies, set this if multiple tasks are defined on the job.")
+        @Schema(title = "Task dependencies", description = "List of upstream taskKeys when multiple tasks run in the job")
         private List<String> dependsOn;
 
         @PluginProperty(dynamic = true)
-        @Schema(title = "Task libraries.")
+        @Schema(title = "Task libraries")
         private List<LibrarySetting> libraries;
     }
 
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The job identifier.")
+        @Schema(title = "Job identifier")
         private Long jobId;
 
-        @Schema(title = "The job URI on the Databricks console.")
+        @Schema(title = "Job console URI")
         private URI jobURI;
 
-        @Schema(title = "The run identifier.")
+        @Schema(title = "Run identifier")
         private Long runId;
 
-        @Schema(title = "The run URI on the Databricks console.")
+        @Schema(title = "Run console URI")
         private URI runURI;
     }
 }

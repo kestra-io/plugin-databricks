@@ -42,10 +42,13 @@ import jakarta.validation.constraints.NotNull;
         )
     }
 )
-@Schema(title = "Delete a Databricks cluster.")
+@Schema(
+    title = "Delete a Databricks cluster",
+    description = "Terminates and deletes an existing Databricks cluster by clusterId."
+)
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
     @NotNull
-    @Schema(title = "The cluster identifier.")
+    @Schema(title = "Cluster identifier", description = "ID of the cluster to delete")
     private Property<String> clusterId;
 
     @Override
