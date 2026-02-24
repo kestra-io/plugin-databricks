@@ -1,6 +1,6 @@
 group: io.kestra.plugin.databricks.cluster
 name: "cluster"
-title: "Cluster"
+title: "Databricks Cluster"
 description: "Tasks that create and delete Databricks clusters."
 body: "Use these tasks to provision or retire Databricks compute directly from a flow with your workspace host and token. Provide the cluster name, Spark version, and either a fixed worker count (`numWorkers`) or autoscaling bounds (`minWorkers`/`maxWorkers`), optionally with an auto-termination timeout."
 videos: []
