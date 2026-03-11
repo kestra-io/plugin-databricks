@@ -1,25 +1,5 @@
 package io.kestra.plugin.databricks.sql;
 
-import com.databricks.client.jdbc.Driver;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.Example;
-import io.kestra.core.models.annotations.Metric;
-import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.utils.Rethrow;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -35,7 +15,29 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.function.Consumer;
+
+import com.databricks.client.jdbc.Driver;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.utils.Rethrow;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 /**
  * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
@@ -136,8 +138,10 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         runContext.logger().debug("Using JDBC URL: {}", url);
 
         DriverManager.registerDriver(new Driver());
-        try (var connection = DriverManager.getConnection(url, props);
-             var stmt = connection.createStatement()) {
+        try (
+            var connection = DriverManager.getConnection(url, props);
+            var stmt = connection.createStatement()
+        ) {
             String query = runContext.render(sql).as(String.class).orElseThrow();
             runContext.logger().debug("Starting query: {}", query);
 
@@ -149,7 +153,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
                     fileWriter.flush();
                     fileWriter.close();
 
-                    runContext.metric(Counter.of("fetch.size",  size));
+                    runContext.metric(Counter.of("fetch.size", size));
 
                     return Output.builder()
                         .uri(runContext.storage().putFile(tempFile))
@@ -175,7 +179,8 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         return fetch(
             stmt,
             rs,
-            Rethrow.throwConsumer(map -> {
+            Rethrow.throwConsumer(map ->
+            {
                 final String s = MAPPER.writeValueAsString(map);
                 writer.write(s);
                 writer.write("\n");

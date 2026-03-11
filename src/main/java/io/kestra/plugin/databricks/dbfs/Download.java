@@ -1,30 +1,31 @@
 package io.kestra.plugin.databricks.dbfs;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+
+import org.apache.commons.io.IOUtils;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.utils.FileUtils;
 import io.kestra.plugin.databricks.AbstractTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.io.IOUtils;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
-import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -76,8 +77,10 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
         File tempFile = runContext.workingDir().createTempFile(FileUtils.getExtension(path)).toFile();
         var workspace = workspaceClient(runContext);
 
-        try (InputStream in = workspace.dbfs().open(path);
-             OutputStream out = new FileOutputStream(tempFile)) {
+        try (
+            InputStream in = workspace.dbfs().open(path);
+            OutputStream out = new FileOutputStream(tempFile)
+        ) {
             int size = IOUtils.copy(in, out);
             runContext.metric(Counter.of("file.size", size));
             var uri = runContext.storage().putFile(tempFile);

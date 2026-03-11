@@ -1,14 +1,16 @@
 package io.kestra.plugin.databricks.job.task;
 
+import java.util.Map;
+
 import com.databricks.sdk.service.jobs.RunJobTask;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
+
 import lombok.Builder;
 import lombok.Getter;
-
-import java.util.Map;
 
 @Builder
 @Getter

@@ -1,5 +1,11 @@
 package io.kestra.plugin.databricks.cli;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -11,17 +17,12 @@ import io.kestra.plugin.scripts.exec.scripts.models.DockerOptions;
 import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import io.kestra.plugin.scripts.exec.scripts.runners.CommandsWrapper;
 import io.kestra.plugin.scripts.runner.docker.Docker;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-
-import jakarta.validation.constraints.NotNull;
-import org.slf4j.Logger;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @SuperBuilder
 @ToString
@@ -157,7 +158,8 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
         Map<String, String> renderedCliOptions = runContext.render(this.options).asMap(String.class, String.class);
 
-        renderedCliOptions.forEach((key, value) -> {
+        renderedCliOptions.forEach((key, value) ->
+        {
             commandBuilder.append(" ").append(key);
             if (value != null && !value.isBlank()) {
                 commandBuilder.append(" ").append(value);

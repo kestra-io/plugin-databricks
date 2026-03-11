@@ -1,24 +1,25 @@
 package io.kestra.plugin.databricks.cluster;
 
+import java.net.URI;
+
 import com.databricks.sdk.service.compute.AutoScale;
 import com.databricks.sdk.service.compute.State;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
-import java.net.URI;
-import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -91,15 +92,16 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     @Override
     public Output run(RunContext runContext) throws Exception {
         var createCluster = new com.databricks.sdk.service.compute.CreateCluster()
-                .setClusterName(runContext.render(clusterName).as(String.class).orElseThrow())
-                .setSparkVersion(runContext.render(sparkVersion).as(String.class).orElseThrow())
-                .setNodeTypeId(runContext.render(nodeTypeId).as(String.class).orElse(null))
-                .setAutoterminationMinutes(runContext.render(autoTerminationMinutes).as(Long.class).orElse(null))
-                .setNumWorkers(runContext.render(numWorkers).as(Long.class).orElse(null));
+            .setClusterName(runContext.render(clusterName).as(String.class).orElseThrow())
+            .setSparkVersion(runContext.render(sparkVersion).as(String.class).orElseThrow())
+            .setNodeTypeId(runContext.render(nodeTypeId).as(String.class).orElse(null))
+            .setAutoterminationMinutes(runContext.render(autoTerminationMinutes).as(Long.class).orElse(null))
+            .setNumWorkers(runContext.render(numWorkers).as(Long.class).orElse(null));
         if (minWorkers != null && maxWorkers != null) {
-            createCluster.setAutoscale(new AutoScale()
-                .setMinWorkers(runContext.render(minWorkers).as(Long.class).orElseThrow())
-                .setMaxWorkers(runContext.render(maxWorkers).as(Long.class).orElseThrow())
+            createCluster.setAutoscale(
+                new AutoScale()
+                    .setMinWorkers(runContext.render(minWorkers).as(Long.class).orElseThrow())
+                    .setMaxWorkers(runContext.render(maxWorkers).as(Long.class).orElseThrow())
             );
         }
 

@@ -1,7 +1,12 @@
 package io.kestra.plugin.databricks.job;
 
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
+
 import com.databricks.sdk.service.jobs.RunNow;
 import com.databricks.sdk.service.jobs.Task;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -11,19 +16,16 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
 import io.kestra.plugin.databricks.utils.TaskUtils;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
-import java.net.URI;
-import java.time.Duration;
-import java.util.List;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -80,29 +82,33 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        List<Task> tasks = jobTasks.stream().map(throwFunction(
-            setting -> new Task()
-                .setDescription(runContext.render(setting.description).as(String.class).orElse(null))
-                .setExistingClusterId(runContext.render(setting.existingClusterId).as(String.class).orElse(null))
-                .setTaskKey(runContext.render(setting.taskKey).as(String.class).orElse(null))
-                .setTimeoutSeconds(runContext.render(setting.timeoutSeconds).as(Long.class).orElse(null))
-                .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
-                .setDbtTask(setting.dbtTask != null ? setting.dbtTask.toDbtTask(runContext) :  null)
-                .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
-                .setRunJobTask(setting.runJobTask != null ? setting.runJobTask.toRunJobTask(runContext) : null)
-                .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
-                .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
-                .setSqlTask(setting.sqlTask != null ? setting.sqlTask.toSqlTask(runContext) : null)
-                .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
-                .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
-                .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))
-                .setLibraries(setting.libraries != null ? setting.libraries.stream().map(throwFunction(l -> l.toLibrary(runContext))).toList() : null)))
+        List<Task> tasks = jobTasks.stream().map(
+            throwFunction(
+                setting -> new Task()
+                    .setDescription(runContext.render(setting.description).as(String.class).orElse(null))
+                    .setExistingClusterId(runContext.render(setting.existingClusterId).as(String.class).orElse(null))
+                    .setTaskKey(runContext.render(setting.taskKey).as(String.class).orElse(null))
+                    .setTimeoutSeconds(runContext.render(setting.timeoutSeconds).as(Long.class).orElse(null))
+                    .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
+                    .setDbtTask(setting.dbtTask != null ? setting.dbtTask.toDbtTask(runContext) : null)
+                    .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
+                    .setRunJobTask(setting.runJobTask != null ? setting.runJobTask.toRunJobTask(runContext) : null)
+                    .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
+                    .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
+                    .setSqlTask(setting.sqlTask != null ? setting.sqlTask.toSqlTask(runContext) : null)
+                    .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
+                    .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
+                    .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))
+                    .setLibraries(setting.libraries != null ? setting.libraries.stream().map(throwFunction(l -> l.toLibrary(runContext))).toList() : null)
+            )
+        )
             .toList();
 
         var workspaceClient = workspaceClient(runContext);
-        var job = workspaceClient.jobs().create(new com.databricks.sdk.service.jobs.CreateJob()
-            .setName(runContext.render(jobName).as(String.class).orElseThrow())
-            .setTasks(tasks)
+        var job = workspaceClient.jobs().create(
+            new com.databricks.sdk.service.jobs.CreateJob()
+                .setName(runContext.render(jobName).as(String.class).orElseThrow())
+                .setTasks(tasks)
         );
         var jobURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId());
         runContext.logger().info("Job created: {}", jobURI);
@@ -116,7 +122,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
             runContext.logger().info("Waiting for job to be terminated or skipped for {}", waitTime);
             workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(run.getRunId(), waitTime, null);
             //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
-//            runContext.logger().info(workspaceClient.jobs().getRunOutput(run.getRunId()).getLogs());
+            //            runContext.logger().info(workspaceClient.jobs().getRunOutput(run.getRunId()).getLogs());
             //TODO when finished, we have a lot of info that we can send as outputs and metrics
         }
 

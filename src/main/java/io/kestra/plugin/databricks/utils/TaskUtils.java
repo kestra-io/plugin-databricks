@@ -1,8 +1,8 @@
 package io.kestra.plugin.databricks.utils;
 
-import com.databricks.sdk.service.jobs.TaskDependency;
-
 import java.util.List;
+
+import com.databricks.sdk.service.jobs.TaskDependency;
 
 public final class TaskUtils {
     private TaskUtils() {
@@ -10,8 +10,9 @@ public final class TaskUtils {
     }
 
     public static List<TaskDependency> dependsOn(List<String> dependsOn) {
-        return dependsOn == null ? null : dependsOn.stream()
-            .map(taskKey -> new TaskDependency().setTaskKey(taskKey))
-            .toList();
+        return dependsOn == null ? null
+            : dependsOn.stream()
+                .map(taskKey -> new TaskDependency().setTaskKey(taskKey))
+                .toList();
     }
 }

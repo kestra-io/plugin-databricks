@@ -3,11 +3,13 @@ package io.kestra.plugin.databricks;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.ConfigLoader;
 import com.databricks.sdk.core.DatabricksConfig;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -64,7 +66,6 @@ public abstract class AbstractTask extends Task {
                 .setAzureClientSecret(runContext.render(authentication.azureClientSecret).as(String.class).orElse(null))
                 .setAzureTenantId(runContext.render(authentication.azureTenantId).as(String.class).orElse(null));
         }
-
 
         // will use env var for each config that is not set
         ConfigLoader.resolve(cfg);

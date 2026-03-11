@@ -1,6 +1,11 @@
 package io.kestra.plugin.databricks.job;
 
+import java.net.URI;
+import java.time.Duration;
+import java.util.List;
+
 import com.databricks.sdk.service.jobs.SubmitTask;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -10,19 +15,16 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
 import io.kestra.plugin.databricks.utils.TaskUtils;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
-import java.net.URI;
-import java.time.Duration;
-import java.util.List;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 
@@ -31,35 +33,37 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 @EqualsAndHashCode
 @Getter
 @NoArgsConstructor
-@Plugin(examples = {
-    @Example(
-        title = "Submit a Databricks run and wait up to 5 minutes for its completion.",
-        full = true,
-        code = """
-            id: databricks_job_submit_run
-            namespace: company.team
+@Plugin(
+    examples = {
+        @Example(
+            title = "Submit a Databricks run and wait up to 5 minutes for its completion.",
+            full = true,
+            code = """
+                id: databricks_job_submit_run
+                namespace: company.team
 
-            tasks:
-              - id: submit_run
-                type: io.kestra.plugin.databricks.job.SubmitRun
-                host: "{{ secret('DATABRICKS_HOST') }}"
-                authentication:
-                  token: "{{ secret('DATABRICKS_TOKEN') }}"
-                runTasks:
-                  - existingClusterId: <your-cluster>
-                    taskKey: pysparkTask
-                    sparkPythonTask:
-                      pythonFile: /Shared/hello.py
-                      sparkPythonTaskSource: WORKSPACE
-                waitForCompletion: PT5M
-            """
-    )
-})
+                tasks:
+                  - id: submit_run
+                    type: io.kestra.plugin.databricks.job.SubmitRun
+                    host: "{{ secret('DATABRICKS_HOST') }}"
+                    authentication:
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
+                    runTasks:
+                      - existingClusterId: <your-cluster>
+                        taskKey: pysparkTask
+                        sparkPythonTask:
+                          pythonFile: /Shared/hello.py
+                          sparkPythonTaskSource: WORKSPACE
+                    waitForCompletion: PT5M
+                """
+        )
+    }
+)
 @Schema(
     title = "Submit a Databricks run",
     description = "Submits one or more tasks as an ad-hoc run; optionally waits up to waitForCompletion for terminal state."
 )
-public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.Output> {
+public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @Schema(title = "Run name")
     private Property<String> runName;
 
@@ -74,27 +78,32 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        List<SubmitTask> tasks = runTasks.stream().map(throwFunction(setting ->
-            new SubmitTask()
-                .setExistingClusterId(runContext.render(setting.existingClusterId))
-                .setTaskKey(runContext.render(setting.taskKey))
-                .setTimeoutSeconds(setting.timeoutSeconds)
-                .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
-                .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
-                .setRunJobTask(setting.runJobTask != null ? setting.runJobTask.toRunJobTask(runContext) : null)
-                .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
-                .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
-                .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
-                .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
-                .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))
-                .setLibraries(setting.libraries != null ? setting.libraries.stream().map(throwFunction(l -> l.toLibrary(runContext))).toList() : null)))
+        List<SubmitTask> tasks = runTasks.stream().map(
+            throwFunction(
+                setting -> new SubmitTask()
+                    .setExistingClusterId(runContext.render(setting.existingClusterId))
+                    .setTaskKey(runContext.render(setting.taskKey))
+                    .setTimeoutSeconds(setting.timeoutSeconds)
+                    .setNotebookTask(setting.notebookTask != null ? setting.notebookTask.toNotebookTask(runContext) : null)
+                    .setPipelineTask(setting.pipelineTask != null ? setting.pipelineTask.toPipelineTask(runContext) : null)
+                    .setRunJobTask(setting.runJobTask != null ? setting.runJobTask.toRunJobTask(runContext) : null)
+                    .setSparkJarTask(setting.sparkJarTask != null ? setting.sparkJarTask.toSparkJarTask(runContext) : null)
+                    .setSparkSubmitTask(setting.sparkSubmitTask != null ? setting.sparkSubmitTask.toSparkSubmitTask(runContext) : null)
+                    .setSparkPythonTask(setting.sparkPythonTask != null ? setting.sparkPythonTask.toSparkPythonTask(runContext) : null)
+                    .setPythonWheelTask(setting.pythonWheelTask != null ? setting.pythonWheelTask.toPythonWheelTask(runContext) : null)
+                    .setDependsOn(TaskUtils.dependsOn(setting.dependsOn))
+                    .setLibraries(setting.libraries != null ? setting.libraries.stream().map(throwFunction(l -> l.toLibrary(runContext))).toList() : null)
+            )
+        )
             .toList();
 
         var workspaceClient = workspaceClient(runContext);
 
-        var response = workspaceClient.jobs().submit(new com.databricks.sdk.service.jobs.SubmitRun()
-            .setTasks(tasks)
-            .setRunName(runContext.render(runName).as(String.class).orElse(null)))
+        var response = workspaceClient.jobs().submit(
+            new com.databricks.sdk.service.jobs.SubmitRun()
+                .setTasks(tasks)
+                .setRunName(runContext.render(runName).as(String.class).orElse(null))
+        )
             .getResponse();
 
         var run = workspaceClient.jobs().getRun(response.getRunId());
@@ -106,7 +115,7 @@ public class SubmitRun  extends AbstractTask implements RunnableTask<SubmitRun.O
             runContext.logger().info("Waiting for run to be terminated or skipped for {}", time);
             workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(response.getRunId(), time, null);
             //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
-//            runContext.logger().info(workspaceClient.jobs().getRunOutput(response.getRunId()).getLogs());
+            //            runContext.logger().info(workspaceClient.jobs().getRunOutput(response.getRunId()).getLogs());
             //TODO when finished, we have a lot of info that we can send as outputs and metrics
         }
         return Output.builder().runURI(runURI).runId(response.getRunId()).build();

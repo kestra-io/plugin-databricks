@@ -1,5 +1,11 @@
 package io.kestra.plugin.databricks.dbfs;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+
+import org.apache.commons.io.IOUtils;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
@@ -10,18 +16,14 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import org.apache.commons.io.IOUtils;
-
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
-import jakarta.validation.constraints.NotNull;
 
 @SuperBuilder
 @ToString
@@ -86,8 +88,10 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         var path = runContext.render(to).as(String.class).orElseThrow();
         var workspace = workspaceClient(runContext);
 
-        try (InputStream in = runContext.storage().getFile(URI.create(runContext.render(from).as(String.class).orElseThrow()));
-             OutputStream out = workspace.dbfs().getOutputStream(path)) {
+        try (
+            InputStream in = runContext.storage().getFile(URI.create(runContext.render(from).as(String.class).orElseThrow()));
+            OutputStream out = workspace.dbfs().getOutputStream(path)
+        ) {
             int size = IOUtils.copy(in, out);
             runContext.metric(Counter.of("file.size", size));
         }
