@@ -53,7 +53,7 @@ dependencies {
 
     // Databricks deps
     api "com.databricks:databricks-sdk-java:0.101.0"
-    api "com.databricks:databricks-jdbc:3.2.1"
+    api "com.databricks:databricks-jdbc:3.3.1"
 }
 
 
