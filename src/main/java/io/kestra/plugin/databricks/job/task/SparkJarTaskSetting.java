@@ -20,7 +20,7 @@ public class SparkJarTaskSetting {
 
     private Property<String> mainClassName;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     @Schema(
         title = "List of task parameters.",
         description = "Can be a list of strings or a variable that binds to a JSON array of strings.",

@@ -17,7 +17,7 @@ import lombok.Getter;
 public class RunJobTaskSetting {
     private Property<String> jobId;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private Object jobParameters;
 
     public RunJobTask toRunJobTask(RunContext runContext) throws IllegalVariableEvaluationException {

@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -59,34 +60,41 @@ import lombok.experimental.SuperBuilder;
 public class CreateCluster extends AbstractTask implements RunnableTask<CreateCluster.Output> {
     @NotNull
     @Schema(title = "Cluster name")
+    @PluginProperty(group = "main")
     private Property<String> clusterName;
 
     @NotNull
     @Schema(title = "Spark version", description = "Runtime identifier, e.g. 13.0.x-scala2.12")
+    @PluginProperty(group = "main")
     private Property<String> sparkVersion;
 
     @Schema(title = "Node type", description = "Instance type; values depend on the workspace cloud provider")
+    @PluginProperty(group = "advanced")
     private Property<String> nodeTypeId;
 
     @Schema(title = "Auto-termination minutes", description = "Idle timeout; cluster is terminated after this duration if set")
+    @PluginProperty(group = "destination")
     private Property<Long> autoTerminationMinutes;
 
     @Schema(
         title = "Fixed workers",
         description = "Required unless autoscaling is configured; sets numWorkers on the cluster"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> numWorkers;
 
     @Schema(
         title = "Minimum workers",
         description = "Use with maxWorkers to enable autoscaling; ignored when numWorkers is set"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> minWorkers;
 
     @Schema(
         title = "Maximum workers",
         description = "Use with minWorkers to enable autoscaling; ignored when numWorkers is set"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> maxWorkers;
 
     @Override

@@ -19,7 +19,7 @@ import lombok.Getter;
 public class PythonWheelTaskSetting {
     private Property<String> entryPoint;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     @Schema(
         title = "List of task parameters.",
         description = "Can be a list of strings or a variable that binds to a JSON array of strings.",
@@ -27,7 +27,7 @@ public class PythonWheelTaskSetting {
     )
     private Object parameters;
 
-    @PluginProperty(dynamic = true, additionalProperties = String.class)
+    @PluginProperty(dynamic = true, additionalProperties = String.class, group = "advanced")
     @Schema(
         title = "Map of task named parameters.",
         description = "Can be a map of string/string or a variable that binds to a JSON object.",

@@ -26,6 +26,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -69,6 +70,7 @@ public class Download extends AbstractTask implements RunnableTask<Download.Outp
         description = "Absolute path to the DBFS file to download"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> from;
 
     @Override

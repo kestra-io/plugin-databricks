@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @Getter
@@ -74,18 +75,22 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
     private static final String DEFAULT_IMAGE = "ghcr.io/databricks/cli:latest";
 
     @Builder.Default
+    @PluginProperty(group = "execution")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(title = "CLI commands to execute", description = "Commands run sequentially with host/token pre-set in the environment")
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<List<String>> commands;
 
     @Schema(title = "Databricks host URL", description = "Workspace URL including protocol, e.g. https://<instance>.cloud.databricks.com")
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> databricksHost;
 
     @Schema(title = "Databricks personal access token", description = "PAT exported to DATABRICKS_TOKEN for each command; render from secrets")
     @NotNull
+    @PluginProperty(group = "main")
     protected Property<String> databricksToken;
 
     @Override

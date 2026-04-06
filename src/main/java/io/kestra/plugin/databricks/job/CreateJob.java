@@ -69,14 +69,16 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 )
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
     @Schema(title = "Job name")
+    @PluginProperty(group = "advanced")
     private Property<String> jobName;
 
     @Schema(title = "Wait for completion", description = "If set, waits up to the given duration (e.g., PT1H) for the submitted run to finish")
+    @PluginProperty(group = "execution")
     private Property<Duration> waitForCompletion;
 
     @NotNull
     @NotEmpty
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "main")
     @Schema(title = "Job tasks", description = "Task definitions; when multiple tasks are present, specify dependsOn for ordering")
     private List<JobTaskSetting> jobTasks;
 
