@@ -15,6 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -48,6 +49,7 @@ import lombok.experimental.SuperBuilder;
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
     @NotNull
     @Schema(title = "Cluster identifier", description = "ID of the cluster to delete")
+    @PluginProperty(group = "main")
     private Property<String> clusterId;
 
     @Override

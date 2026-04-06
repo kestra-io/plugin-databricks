@@ -28,15 +28,18 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 public abstract class AbstractTask extends Task {
     @Schema(title = "Databricks host.")
+    @PluginProperty(group = "connection")
     private Property<String> host;
 
     @Schema(title = "Databricks account identifier.")
+    @PluginProperty(group = "advanced")
     private Property<String> accountId;
 
     @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one.")
+    @PluginProperty(group = "advanced")
     private Property<String> configFile;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "connection")
     @Schema(
         title = "Databricks authentication configuration.",
         description = """

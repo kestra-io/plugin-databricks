@@ -21,7 +21,7 @@ public class SqlTaskSetting {
 
     private Property<String> queryId;
 
-    @PluginProperty(dynamic = true, additionalProperties = String.class)
+    @PluginProperty(dynamic = true, additionalProperties = String.class, group = "advanced")
     @Schema(
         title = "Map of task parameters.",
         description = "Can be a map of string/string or a variable that binds to a JSON object.",

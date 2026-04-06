@@ -73,7 +73,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         description = "Internal storage URI of the file to upload (kestra:// ...)"
     )
     @NotNull
-    @PluginProperty(internalStorageURI = true)
+    @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Schema(
@@ -81,6 +81,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
         description = "Absolute DBFS path such as /mnt/volume/file.parquet"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> to;
 
     @Override

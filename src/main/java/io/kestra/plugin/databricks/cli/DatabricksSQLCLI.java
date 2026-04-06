@@ -23,6 +23,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -66,6 +67,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "Workspace hostname for the SQL warehouse, without a trailing slash"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> host;
 
     @Schema(
@@ -73,6 +75,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "Databricks personal access token; render from secrets"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> token;
 
     @Schema(
@@ -80,6 +83,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "HTTP path for the SQL warehouse (from workspace connection details)"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<String> httpPath;
 
     @Schema(
@@ -87,12 +91,14 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "One or more SQL statements rendered then executed in order with dbsqlcli"
     )
     @NotNull
+    @PluginProperty(group = "main")
     private Property<List<String>> commands;
 
     @Schema(
         title = "Additional CLI options",
         description = "Map of extra dbsqlcli flags appended to the command, e.g. `--output json`"
     )
+    @PluginProperty(group = "advanced")
     private Property<Map<String, String>> options;
 
     @Schema(
@@ -101,10 +107,12 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
     )
     @Builder.Default
     @Valid
+    @PluginProperty(group = "execution")
     private TaskRunner<?> taskRunner = Docker.instance();
 
     @Schema(title = "Task runner container image", description = "Container image used when the task runner is Docker-based; default ghcr.io/kestra-io/databricks-sql-cli")
     @Builder.Default
+    @PluginProperty(group = "execution")
     private Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(
@@ -112,10 +120,13 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "Legacy Docker options kept for backward compatibility; prefer taskRunner"
     )
     @Deprecated
+    @PluginProperty(group = "deprecated")
     private DockerOptions docker;
 
+    @PluginProperty(group = "source")
     private Object inputFiles;
 
+    @PluginProperty(group = "destination")
     private Property<List<String>> outputFiles;
 
     @Override

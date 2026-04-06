@@ -38,6 +38,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 /**
  * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
@@ -84,6 +85,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
 
     @NotNull
     @Schema(title = "Databricks host", description = "Server hostname without protocol, e.g. adb-12345.7.azuredatabricks.net")
+    @PluginProperty(group = "main")
     private Property<String> host;
 
     @NotNull
@@ -91,28 +93,35 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         title = "Databricks cluster HTTP Path",
         description = "HTTP Path from the cluster connection details (Advanced options → JDBC/ODBC)."
     )
+    @PluginProperty(group = "main")
     private Property<String> httpPath;
 
     @Schema(title = "Catalog used for the connection", description = "Sets ConnCatalog on the JDBC URL when provided")
+    @PluginProperty(group = "advanced")
     private Property<String> catalog;
 
     @Schema(title = "Schema used for the connection", description = "Sets ConnSchema on the JDBC URL when provided")
+    @PluginProperty(group = "connection")
     private Property<String> schema;
 
     @Schema(title = "Databricks access token", description = "Personal Access Token passed as the JDBC password; render from secrets")
+    @PluginProperty(group = "connection")
     private Property<String> accessToken;
 
     @Schema(title = "Additional JDBC properties", description = "Optional map merged into the Databricks driver properties after authentication")
+    @PluginProperty(group = "advanced")
     private Property<Map<String, String>> properties;
 
     @NotNull
     @Schema(title = "SQL query to execute", description = "SQL text rendered with Flow variables before execution")
+    @PluginProperty(group = "main")
     private Property<String> sql;
 
     @Schema(
         title = "Time zone for temporal values",
         description = "Timezone used when converting date/time columns; defaults to the worker JVM time zone"
     )
+    @PluginProperty(group = "execution")
     private Property<String> timeZoneId;
 
     //TODO should we allow to fetch or do we design only for big data ?

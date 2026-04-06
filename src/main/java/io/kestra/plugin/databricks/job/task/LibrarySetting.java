@@ -18,17 +18,17 @@ import lombok.Getter;
 @Builder
 @Getter
 public class LibrarySetting {
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private CranSetting cran;
 
     private Property<String> egg;
 
     private Property<String> jar;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private MavenSetting maven;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private PypiSetting pypi;
 
     private Property<String> whl;

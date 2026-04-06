@@ -21,7 +21,7 @@ public class NotebookTaskSetting {
 
     private Property<Source> source;
 
-    @PluginProperty(dynamic = true, additionalProperties = String.class)
+    @PluginProperty(dynamic = true, additionalProperties = String.class, group = "advanced")
     @Schema(
         title = "Map of task base parameters.",
         description = "Can be a map of string/string or a variable that binds to a JSON object.",

@@ -65,14 +65,16 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 )
 public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     @Schema(title = "Run name")
+    @PluginProperty(group = "advanced")
     private Property<String> runName;
 
     @Schema(title = "Wait for completion", description = "If set, waits up to the given duration (e.g., PT30M) for the run to finish")
+    @PluginProperty(group = "execution")
     private Property<Duration> waitForCompletion;
 
     @NotNull
     @NotEmpty
-    @PluginProperty
+    @PluginProperty(group = "main")
     @Schema(title = "Run tasks", description = "Task definitions for this run; set dependsOn when multiple tasks are present")
     private List<RunSubmitTaskSetting> runTasks;
 
