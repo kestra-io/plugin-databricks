@@ -1,6 +1,6 @@
 group: io.kestra.plugin.databricks.sql
 name: "sql"
-title: "SQL"
+title: "Databricks SQL"
 description: "Tasks that execute SQL queries on a Databricks cluster via JDBC."
 body: "Run parameterized SQL against a Databricks cluster or SQL warehouse using the JDBC driver by providing the host, HTTP path, access token, and SQL statement. Results are streamed to Kestra storage (Ion format) with a row-count metric, and you can supply optional catalog/schema, time zone, and JDBC properties."
 videos: []
