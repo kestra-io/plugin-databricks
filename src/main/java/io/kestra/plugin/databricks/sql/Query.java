@@ -105,7 +105,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     private Property<String> schema;
 
     @Schema(title = "Databricks access token", description = "Personal Access Token passed as the JDBC password; render from secrets")
-    @PluginProperty(group = "connection")
+    @PluginProperty(secret = true, group = "connection")
     private Property<String> accessToken;
 
     @Schema(title = "Additional JDBC properties", description = "Optional map merged into the Databricks driver properties after authentication")

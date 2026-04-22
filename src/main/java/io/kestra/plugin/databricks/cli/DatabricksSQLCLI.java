@@ -75,7 +75,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         description = "Databricks personal access token; render from secrets"
     )
     @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(secret = true, group = "main")
     private Property<String> token;
 
     @Schema(

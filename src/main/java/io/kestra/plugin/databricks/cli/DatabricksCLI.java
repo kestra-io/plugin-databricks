@@ -90,7 +90,7 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
 
     @Schema(title = "Databricks personal access token", description = "PAT exported to DATABRICKS_TOKEN for each command; render from secrets")
     @NotNull
-    @PluginProperty(group = "main")
+    @PluginProperty(secret = true, group = "main")
     protected Property<String> databricksToken;
 
     @Override
