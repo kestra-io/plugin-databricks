@@ -79,26 +79,37 @@ public abstract class AbstractTask extends Task {
     @Builder
     @Getter
     public static class AuthenticationConfig {
+        @Schema(title = "Authentication type")
         private Property<String> authType;
 
+        @Schema(title = "Databricks personal access token")
         private Property<String> token;
 
+        @Schema(title = "Client ID")
         private Property<String> clientId;
 
+        @Schema(title = "Client secret")
         private Property<String> clientSecret;
 
+        @Schema(title = "Username")
         private Property<String> username;
 
+        @Schema(title = "Password")
         private Property<String> password;
 
+        @Schema(title = "Google credentials JSON")
         private Property<String> googleCredentials;
 
+        @Schema(title = "Google service account email")
         private Property<String> googleServiceAccount;
 
+        @Schema(title = "Azure client ID")
         private Property<String> azureClientId;
 
+        @Schema(title = "Azure client secret")
         private Property<String> azureClientSecret;
 
+        @Schema(title = "Azure tenant ID")
         private Property<String> azureTenantId;
     }
 }
