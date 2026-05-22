@@ -1,5 +1,5 @@
 @PluginSubGroup(
-    title = "CLI",
+    title = "Databricks CLI",
     description = "This sub-group of plugins contains tasks for executing Databricks SQL CLI commands.",
     categories = { PluginSubGroup.PluginCategory.DATA }
 )
