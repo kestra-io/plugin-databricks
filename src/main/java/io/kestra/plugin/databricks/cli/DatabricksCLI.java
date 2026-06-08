@@ -142,14 +142,14 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
 
     @Override
     public ScriptOutput run(RunContext runContext) throws Exception {
-        var os = runContext.render(this.targetOS).as(TargetOS.class).orElse(null);
+        var rOs = runContext.render(this.targetOS).as(TargetOS.class).orElse(null);
 
-        var host = runContext.render(databricksHost).as(String.class).orElseThrow();
+        var rHost = runContext.render(databricksHost).as(String.class).orElseThrow();
         var rToken = runContext.render(databricksToken).as(String.class).orElse(null);
         var rClientId = runContext.render(clientId).as(String.class).orElse(null);
         var rClientSecret = runContext.render(clientSecret).as(String.class).orElse(null);
 
-        var envPrefix = buildEnvPrefix(host, rToken, rClientId, rClientSecret);
+        var envPrefix = buildEnvPrefix(rHost, rToken, rClientId, rClientSecret);
 
         var envCommands = runContext.render(commands)
             .asList(String.class)
@@ -162,7 +162,7 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
             .withBeforeCommands(beforeCommands)
             .withBeforeCommandsWithOptions(true)
             .withCommands(Property.ofValue(envCommands))
-            .withTargetOS(os)
+            .withTargetOS(rOs)
             .run();
     }
 
