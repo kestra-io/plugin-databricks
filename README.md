@@ -48,6 +48,35 @@
 - Provides plugin components under `io.kestra.plugin.databricks`.
 - Includes classes such as `DeleteCluster`, `CreateCluster`, `CreateJob`, `SubmitRun`.
 
+## DatabricksCLI — Authentication
+
+`DatabricksCLI` supports two mutually exclusive authentication modes. `databricksToken` takes precedence when both are provided.
+
+**PAT (personal access token)**
+
+```yaml
+tasks:
+  - id: list_clusters
+    type: io.kestra.plugin.databricks.cli.DatabricksCLI
+    databricksHost: "{{ secret('DATABRICKS_HOST') }}"
+    databricksToken: "{{ secret('DATABRICKS_TOKEN') }}"
+    commands:
+      - databricks clusters list
+```
+
+**OAuth M2M (service principal)**
+
+```yaml
+tasks:
+  - id: list_clusters
+    type: io.kestra.plugin.databricks.cli.DatabricksCLI
+    databricksHost: "{{ secret('DATABRICKS_HOST') }}"
+    clientId: "{{ secret('DATABRICKS_CLIENT_ID') }}"
+    clientSecret: "{{ secret('DATABRICKS_CLIENT_SECRET') }}"
+    commands:
+      - databricks clusters list
+```
+
 ## Documentation
 * Full documentation can be found under [kestra.io/docs](https://kestra.io/docs)
 * Documentation for developing a plugin is included in the [Plugin Developer Guide](https://kestra.io/docs/plugin-developer-guide/).
