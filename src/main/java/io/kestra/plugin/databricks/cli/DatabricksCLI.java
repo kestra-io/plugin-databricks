@@ -120,7 +120,7 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
         title = "OAuth M2M client ID",
         description = "Service principal client ID; exported to DATABRICKS_CLIENT_ID. Use with `clientSecret` as an alternative to `databricksToken`."
     )
-    @PluginProperty(group = "main")
+    @PluginProperty(secret = true, group = "main")
     protected Property<String> clientId;
 
     @Schema(
