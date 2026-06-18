@@ -1,16 +1,17 @@
 package io.kestra.plugin.databricks.job.task;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.databind.type.MapType;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.JacksonMapper;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 
 import static io.kestra.core.utils.Rethrow.throwFunction;
 

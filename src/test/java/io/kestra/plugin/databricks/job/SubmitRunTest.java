@@ -1,30 +1,37 @@
 package io.kestra.plugin.databricks.job;
 
+import java.time.Duration;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
+
 import com.databricks.sdk.service.jobs.Source;
+import com.google.api.client.util.Strings;
 import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.SparkPythonTaskSetting;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 
-import java.time.Duration;
-import java.util.List;
+import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
 
 @KestraTest
-@Disabled("Need an account to work")
+@DisabledIf(
+    value = "canNotBeEnabled",
+    disabledReason = "Disabled because it requires Databricks secrets: host, token, clusterId"
+)
 class SubmitRunTest {
-    private static final String TOKEN = "";
-    private static final String HOST = "";
-    private static final String CLUSTER_ID = "";
+    protected static final String CLUSTER_ID = System.getenv("DATABRICKS_CLUSTER_ID");
+    protected static final String HOST = System.getenv("DATABRICKS_HOST");
+    protected static final String TOKEN = System.getenv("DATABRICKS_TOKEN");
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -35,9 +42,9 @@ class SubmitRunTest {
             .id(IdUtils.create())
             .type(SubmitRun.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
+            .host(Property.ofValue(HOST))
             .runTasks(
                 List.of(
                     SubmitRun.RunSubmitTaskSetting.builder()
@@ -45,18 +52,22 @@ class SubmitRunTest {
                         .taskKey("taskKey")
                         .sparkPythonTask(
                             SparkPythonTaskSetting.builder()
-                                .sparkPythonTaskSource(Property.of(Source.WORKSPACE))
-                                .pythonFile(Property.of("/Shared/hello.py"))
+                                .sparkPythonTaskSource(Property.ofValue(Source.WORKSPACE))
+                                .pythonFile(Property.ofValue("/Shared/hello.py"))
                                 .build()
                         )
                         .build()
                 )
             )
-            .waitForCompletion(Property.of(Duration.ofMinutes(5)))
+            .waitForCompletion(Property.ofValue(Duration.ofMinutes(5)))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output.getRunId(), notNullValue());
+    }
+
+    protected static boolean canNotBeEnabled() {
+        return Strings.isNullOrEmpty(HOST) || Strings.isNullOrEmpty(TOKEN) || Strings.isNullOrEmpty(CLUSTER_ID);
     }
 }

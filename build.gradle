@@ -1,14 +1,14 @@
 plugins {
+    id 'io.kestra.gradle.spotless-conventions' version '1.1.0'
+    id "com.vanniktech.maven.publish" version "0.36.0"
+    id "io.kestra.gradle.inject-bom-versions" version "1.1.0"
     id 'java-library'
     id "idea"
     id 'jacoco'
     id "com.adarshr.test-logger" version "4.0.0"
-    id "com.github.johnrengelman.shadow" version "8.1.1"
-    id 'ru.vyarus.java-lib' version '3.0.0'
-    id 'ru.vyarus.github-info' version '2.0.0'
+    id "com.gradleup.shadow" version "9.4.2"
     id 'signing'
-    id "io.github.gradle-nexus.publish-plugin" version "2.0.0"
-    id "com.github.ben-manes.versions" version "0.52.0"
+    id "com.github.ben-manes.versions" version "0.54.0"
     id 'net.researchgate.release' version '3.1.0'
 }
 
@@ -18,12 +18,16 @@ repositories {
     mavenLocal()
     mavenCentral()
     if (isBuildSnapshot) {
-        maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+        maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
     }
 }
 
-sourceCompatibility = 21
-targetCompatibility = 21
+final targetJavaVersion = JavaVersion.VERSION_21
+
+java {
+    sourceCompatibility = targetJavaVersion
+    targetCompatibility = targetJavaVersion
+}
 
 group "io.kestra.plugin"
 description 'Databricks plugin for Kestra'
@@ -37,7 +41,6 @@ dependencies {
     // Platform
     annotationProcessor enforcedPlatform("io.kestra:platform:$kestraVersion")
     implementation enforcedPlatform("io.kestra:platform:$kestraVersion")
-    api enforcedPlatform("io.kestra:platform:$kestraVersion")
 
     // Lombok
     annotationProcessor "org.projectlombok:lombok"
@@ -46,10 +49,11 @@ dependencies {
     // Kestra
     annotationProcessor group: "io.kestra", name: "processor", version: kestraVersion
     compileOnly group: "io.kestra", name: "core", version: kestraVersion
+    compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Databricks deps
-    api "com.databricks:databricks-sdk-java:0.42.0"
-    api "com.databricks:databricks-jdbc:2.7.1"
+    api "com.databricks:databricks-sdk-java:0.119.0"
+    api "com.databricks:databricks-jdbc:3.4.1"
 }
 
 
@@ -95,6 +99,7 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter-engine"
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
+    testImplementation group: "io.kestra", name: "script", version: kestraVersion
 }
 
 /**********************************************************************************************************************\
@@ -113,7 +118,7 @@ configurations {
 }
 
 dependencies {
-    agent "org.aspectj:aspectjweaver:1.9.23"
+    agent "org.aspectj:aspectjweaver:1.9.25.1"
 }
 
 test {
@@ -129,18 +134,38 @@ test {
 
 jacocoTestReport {
     dependsOn test
+    reports {
+        xml.required.set(true)
+    }
 }
 
 /**********************************************************************************************************************\
  * Publish
  **********************************************************************************************************************/
-nexusPublishing {
-    repositoryDescription = "${project.group}:${rootProject.name}:${project.version}"
-    useStaging = !isBuildSnapshot
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+mavenPublishing {
+    publishToMavenCentral(true)
+    signAllPublications()
+    coordinates("${project.group}", "${project.name}", "${project.version}")
+    pom {
+        name = "${project.name}"
+        description = "${project.group}:${project.name}:${project.version}"
+        url = "https://github.com/kestra-io/${project.name}"
+        licenses {
+            license {
+                name = 'The Apache License, Version 2.0'
+                url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+            }
+        }
+        developers {
+            developer {
+                id = 'tchiotludo'
+                name = 'Dehon'
+                email = 'ldehon@kestra.io'
+            }
+        }
+        scm {
+            connection = 'scm:git:'
+            url = "https://github.com/kestra-io/${project.name}"
         }
     }
 }
@@ -162,24 +187,12 @@ jar {
     }
 }
 
-maven.pom {
-    developers {
-        developer {
-            id = "tchiotludo"
-            name = "Ludovic Dehon"
-        }
-    }
-}
 
 shadowJar {
     archiveClassifier.set(null)
     mergeServiceFiles()
 }
 
-github {
-    user 'kestra-io'
-    license 'Apache'
-}
 
 /**********************************************************************************************************************\
  * Version
@@ -192,7 +205,7 @@ release {
     tagTemplate = 'v${version}'
     buildTasks = ['classes']
     git {
-        requireBranch.set('master')
+        requireBranch.set('main')
     }
 
     // Dynamically set properties with default values

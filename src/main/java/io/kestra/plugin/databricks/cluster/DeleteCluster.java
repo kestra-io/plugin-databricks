@@ -2,20 +2,20 @@ package io.kestra.plugin.databricks.cluster;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.VoidOutput;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
-import jakarta.validation.constraints.NotNull;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -42,10 +42,14 @@ import jakarta.validation.constraints.NotNull;
         )
     }
 )
-@Schema(title = "Delete a Databricks cluster.")
+@Schema(
+    title = "Delete a Databricks cluster",
+    description = "Terminates and deletes an existing Databricks cluster by clusterId."
+)
 public class DeleteCluster extends AbstractTask implements RunnableTask<VoidOutput> {
     @NotNull
-    @Schema(title = "The cluster identifier.")
+    @Schema(title = "Cluster identifier", description = "ID of the cluster to delete")
+    @PluginProperty(group = "main")
     private Property<String> clusterId;
 
     @Override

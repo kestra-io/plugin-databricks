@@ -3,11 +3,13 @@ package io.kestra.plugin.databricks;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.ConfigLoader;
 import com.databricks.sdk.core.DatabricksConfig;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.Task;
 import io.kestra.core.runners.RunContext;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -26,15 +28,18 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 public abstract class AbstractTask extends Task {
     @Schema(title = "Databricks host.")
+    @PluginProperty(group = "connection")
     private Property<String> host;
 
     @Schema(title = "Databricks account identifier.")
+    @PluginProperty(group = "advanced")
     private Property<String> accountId;
 
     @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one.")
+    @PluginProperty(group = "advanced")
     private Property<String> configFile;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "connection")
     @Schema(
         title = "Databricks authentication configuration.",
         description = """
@@ -65,7 +70,6 @@ public abstract class AbstractTask extends Task {
                 .setAzureTenantId(runContext.render(authentication.azureTenantId).as(String.class).orElse(null));
         }
 
-
         // will use env var for each config that is not set
         ConfigLoader.resolve(cfg);
 
@@ -75,26 +79,37 @@ public abstract class AbstractTask extends Task {
     @Builder
     @Getter
     public static class AuthenticationConfig {
+        @Schema(title = "Authentication type")
         private Property<String> authType;
 
+        @Schema(title = "Databricks personal access token")
         private Property<String> token;
 
+        @Schema(title = "Client ID")
         private Property<String> clientId;
 
+        @Schema(title = "Client secret")
         private Property<String> clientSecret;
 
+        @Schema(title = "Username")
         private Property<String> username;
 
+        @Schema(title = "Password")
         private Property<String> password;
 
+        @Schema(title = "Google credentials JSON")
         private Property<String> googleCredentials;
 
+        @Schema(title = "Google service account email")
         private Property<String> googleServiceAccount;
 
+        @Schema(title = "Azure client ID")
         private Property<String> azureClientId;
 
+        @Schema(title = "Azure client secret")
         private Property<String> azureClientSecret;
 
+        @Schema(title = "Azure tenant ID")
         private Property<String> azureTenantId;
     }
 }

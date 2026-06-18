@@ -1,30 +1,38 @@
 package io.kestra.plugin.databricks.dbfs;
 
-import com.google.common.collect.ImmutableMap;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.runners.RunContextFactory;
-import io.kestra.core.storages.StorageInterface;
-import io.kestra.core.utils.IdUtils;
-import io.kestra.core.utils.TestsUtils;
-import io.kestra.plugin.databricks.AbstractTask;
-import io.kestra.core.junit.annotations.KestraTest;
-import jakarta.inject.Inject;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.net.URI;
 import java.util.Objects;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
+
+import com.google.api.client.util.Strings;
+import com.google.common.collect.ImmutableMap;
+
+import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContextFactory;
+import io.kestra.core.storages.StorageInterface;
+import io.kestra.core.tenant.TenantService;
+import io.kestra.core.utils.IdUtils;
+import io.kestra.core.utils.TestsUtils;
+import io.kestra.plugin.databricks.AbstractTask;
+
+import jakarta.inject.Inject;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 
 @KestraTest
-@Disabled("Need an account to work")
+@DisabledIf(
+    value = "canNotBeEnabled",
+    disabledReason = "Disabled because it requires Databricks secrets: host, token"
+)
 class UploadTest {
-    private static final String TOKEN = "";
-    private static final String HOST = "";
+    protected static final String HOST = System.getenv("DATABRICKS_HOST");
+    protected static final String TOKEN = System.getenv("DATABRICKS_TOKEN");
 
     @Inject
     private RunContextFactory runContextFactory;
@@ -35,27 +43,37 @@ class UploadTest {
     @Test
     void run() throws Exception {
         URI source = storageInterface.put(
-            null,
+            TenantService.MAIN_TENANT,
             null,
             new URI("/" + IdUtils.create()),
-            new FileInputStream(new File(Objects.requireNonNull(UploadTest.class.getClassLoader()
-                    .getResource("test.txt"))
-                .toURI()))
+            new FileInputStream(
+                new File(
+                    Objects.requireNonNull(
+                        UploadTest.class.getClassLoader()
+                            .getResource("test.txt")
+                    )
+                        .toURI()
+                )
+            )
         );
 
         var task = Upload.builder()
             .id(IdUtils.create())
             .type(Upload.class.getName())
             .authentication(
-                AbstractTask.AuthenticationConfig.builder().token(Property.of(TOKEN)).build()
+                AbstractTask.AuthenticationConfig.builder().token(Property.ofValue(TOKEN)).build()
             )
-            .host(Property.of(HOST))
-            .from(Property.of(source.toString()))
-            .to(Property.of("/Share/test.txt"))
+            .host(Property.ofValue(HOST))
+            .from(Property.ofValue(source.toString()))
+            .to(Property.ofValue("/Share/test.txt"))
             .build();
 
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output, nullValue());
+    }
+
+    protected static boolean canNotBeEnabled() {
+        return Strings.isNullOrEmpty(HOST) || Strings.isNullOrEmpty(TOKEN);
     }
 }

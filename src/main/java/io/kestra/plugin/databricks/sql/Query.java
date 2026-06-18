@@ -1,25 +1,5 @@
 package io.kestra.plugin.databricks.sql;
 
-import com.databricks.client.jdbc.Driver;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
-import io.kestra.core.models.annotations.Example;
-import io.kestra.core.models.annotations.Metric;
-import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.executions.metrics.Counter;
-import io.kestra.core.models.property.Property;
-import io.kestra.core.models.tasks.RunnableTask;
-import io.kestra.core.models.tasks.Task;
-import io.kestra.core.runners.RunContext;
-import io.kestra.core.serializers.JacksonMapper;
-import io.kestra.core.utils.Rethrow;
-import io.swagger.v3.oas.annotations.media.Schema;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.SuperBuilder;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -35,7 +15,30 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.function.Consumer;
+
+import com.databricks.client.jdbc.Driver;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.models.tasks.Task;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.utils.Rethrow;
+
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+import io.kestra.core.models.annotations.PluginProperty;
 
 /**
  * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
@@ -58,7 +61,7 @@ import jakarta.validation.constraints.NotNull;
                 tasks:
                   - id: sql_query
                     type: io.kestra.plugin.databricks.sql.Query
-                    accessToken: <your-accessToken>
+                    accessToken: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     httpPath: <your-httpPath>
                     sql: SELECT 1
@@ -70,44 +73,55 @@ import jakarta.validation.constraints.NotNull;
     }
 )
 @Schema(
-    title = "Execute a SQL query on a Databricks cluster.",
+    title = "Run a SQL query on Databricks",
     description = """
-        See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#retrieve-the-connection-details) in the Databricks documentation to discover how to retrieve the needed configuration properties.
-        We're using the Databricks JDBC driver to execute a Query, see [https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver-capabilities) for its capabilities.
-
-        Due to current limitation of the JDBC driver with Java 21, Arrow is disabled, performance may be impacted, see [here](https://community.databricks.com/t5/data-engineering/what-s-the-eta-for-supporting-java-21-in-the-jdbc-driver/td-p/57370) and [here](https://community.databricks.com/t5/data-engineering/java-21-support-with-databricks-jdbc-driver/m-p/49297) from Databricks status on Java 21 support.
+        Executes a SQL statement on a Databricks cluster through the JDBC driver.
+        Renders connection values and SQL from the RunContext, then streams results to internal storage as an Ion text file.
+        Arrow is disabled with the Databricks JDBC driver on Java 21, which may reduce fetch throughput.
         """
 )
 public class Query extends Task implements RunnableTask<Query.Output> {
     private static final ObjectMapper MAPPER = JacksonMapper.ofIon();
 
     @NotNull
-    @Schema(title = "Databricks host.")
+    @Schema(title = "Databricks host", description = "Server hostname without protocol, e.g. adb-12345.7.azuredatabricks.net")
+    @PluginProperty(group = "main")
     private Property<String> host;
 
     @NotNull
     @Schema(
-        title = "Databricks cluster HTTP Path.",
-        description = "To retrieve the HTTP Path, go to your Databricks cluster, click on Advanced options then, click on JDBC/ODBC. See [Retrieve the connection details](https://docs.databricks.com/integrations/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url) for more details."
+        title = "Databricks cluster HTTP Path",
+        description = "HTTP Path from the cluster connection details (Advanced options → JDBC/ODBC)."
     )
+    @PluginProperty(group = "main")
     private Property<String> httpPath;
 
+    @Schema(title = "Catalog used for the connection", description = "Sets ConnCatalog on the JDBC URL when provided")
+    @PluginProperty(group = "advanced")
     private Property<String> catalog;
 
+    @Schema(title = "Schema used for the connection", description = "Sets ConnSchema on the JDBC URL when provided")
+    @PluginProperty(group = "connection")
     private Property<String> schema;
 
-    @Schema(title = "Databricks access token.")
+    @Schema(title = "Databricks access token", description = "Personal Access Token passed as the JDBC password; render from secrets")
+    @PluginProperty(secret = true, group = "connection")
     private Property<String> accessToken;
 
+    @Schema(title = "Additional JDBC properties", description = "Optional map merged into the Databricks driver properties after authentication")
+    @PluginProperty(group = "advanced")
     private Property<Map<String, String>> properties;
 
     @NotNull
-    @Schema(title = "SQL query to be executed.")
+    @Schema(title = "SQL query to execute", description = "SQL text rendered with Flow variables before execution")
+    @PluginProperty(group = "main")
     private Property<String> sql;
 
     @Schema(
-        title = "The time zone id to use for date/time manipulation. Default value is the worker default zone id."
+        title = "Time zone for temporal values",
+        description = "Timezone used when converting date/time columns; defaults to the worker JVM time zone"
     )
+    @PluginProperty(group = "execution")
     private Property<String> timeZoneId;
 
     //TODO should we allow to fetch or do we design only for big data ?
@@ -133,8 +147,10 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         runContext.logger().debug("Using JDBC URL: {}", url);
 
         DriverManager.registerDriver(new Driver());
-        try (var connection = DriverManager.getConnection(url, props);
-             var stmt = connection.createStatement()) {
+        try (
+            var connection = DriverManager.getConnection(url, props);
+            var stmt = connection.createStatement()
+        ) {
             String query = runContext.render(sql).as(String.class).orElseThrow();
             runContext.logger().debug("Starting query: {}", query);
 
@@ -146,7 +162,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
                     fileWriter.flush();
                     fileWriter.close();
 
-                    runContext.metric(Counter.of("fetch.size",  size));
+                    runContext.metric(Counter.of("fetch.size", size));
 
                     return Output.builder()
                         .uri(runContext.storage().putFile(tempFile))
@@ -172,7 +188,8 @@ public class Query extends Task implements RunnableTask<Query.Output> {
         return fetch(
             stmt,
             rs,
-            Rethrow.throwConsumer(map -> {
+            Rethrow.throwConsumer(map ->
+            {
                 final String s = MAPPER.writeValueAsString(map);
                 writer.write(s);
                 writer.write("\n");
@@ -220,12 +237,13 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
-            title = "The URI of the result file in Kestra's internal storage (`.ion` file i.e. Amazon Ion text format)."
+            title = "Result file URI",
+            description = "Internal storage URI of the Ion text file containing fetched rows"
         )
         private final URI uri;
 
         @Schema(
-            title = "The number of fetched rows."
+            title = "Number of fetched rows"
         )
         private final Long size;
     }

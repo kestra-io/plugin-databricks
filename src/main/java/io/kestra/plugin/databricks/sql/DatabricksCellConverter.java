@@ -1,13 +1,13 @@
 package io.kestra.plugin.databricks.sql;
 
-import lombok.SneakyThrows;
-
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.ZoneId;
 
-class DatabricksCellConverter  extends AbstractCellConverter {
+import lombok.SneakyThrows;
+
+class DatabricksCellConverter extends AbstractCellConverter {
     public DatabricksCellConverter(ZoneId zoneId) {
         super(zoneId);
     }

@@ -1,24 +1,26 @@
 package io.kestra.plugin.databricks.cluster;
 
+import java.net.URI;
+
 import com.databricks.sdk.service.compute.AutoScale;
 import com.databricks.sdk.service.compute.State;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
-import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-
-import java.net.URI;
-import jakarta.validation.constraints.NotNull;
+import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -38,7 +40,7 @@ import jakarta.validation.constraints.NotNull;
                   - id: create_cluster
                     type: io.kestra.plugin.databricks.cluster.CreateCluster
                     authentication:
-                      token: <your-token>
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     clusterName: kestra-demo
                     nodeTypeId: n2-highmem-4
@@ -48,52 +50,66 @@ import jakarta.validation.constraints.NotNull;
         )
     }
 )
-@Schema(title = "Create a Databricks cluster.")
+@Schema(
+    title = "Create a Databricks cluster",
+    description = """
+        Provisions a new Databricks cluster via the Compute API.
+        Set a fixed worker count with numWorkers or enable autoscaling with minWorkers/maxWorkers; auto termination is optional.
+        """
+)
 public class CreateCluster extends AbstractTask implements RunnableTask<CreateCluster.Output> {
     @NotNull
-    @Schema(title = "The name of the cluster.")
+    @Schema(title = "Cluster name")
+    @PluginProperty(group = "main")
     private Property<String> clusterName;
 
     @NotNull
-    @Schema(title = "The Spark version.")
+    @Schema(title = "Spark version", description = "Runtime identifier, e.g. 13.0.x-scala2.12")
+    @PluginProperty(group = "main")
     private Property<String> sparkVersion;
 
-    @Schema(title = "The type of node, the value depends on the cloud provider.")
+    @Schema(title = "Node type", description = "Instance type; values depend on the workspace cloud provider")
+    @PluginProperty(group = "advanced")
     private Property<String> nodeTypeId;
 
-    @Schema(title = "If set, the cluster will be terminated automatically after this time period.")
+    @Schema(title = "Auto-termination minutes", description = "Idle timeout; cluster is terminated after this duration if set")
+    @PluginProperty(group = "destination")
     private Property<Long> autoTerminationMinutes;
 
     @Schema(
-        title = "The fixed number of workers.",
-        description = "You must set this property unless you use the `minWorkers` and `maxWorkers` properties for autoscaling."
+        title = "Fixed workers",
+        description = "Required unless autoscaling is configured; sets numWorkers on the cluster"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> numWorkers;
 
     @Schema(
-        title = "The minimum number of workers.",
-        description = "Use this property along with `maxWorkers` for autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
+        title = "Minimum workers",
+        description = "Use with maxWorkers to enable autoscaling; ignored when numWorkers is set"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> minWorkers;
 
     @Schema(
-        title = "The maximum number of workers.",
-        description = "Use this property along with `minWorkers` to use autoscaling. Otherwise, set a fixed number of workers using `numWorkers`."
+        title = "Maximum workers",
+        description = "Use with minWorkers to enable autoscaling; ignored when numWorkers is set"
     )
+    @PluginProperty(group = "advanced")
     private Property<Long> maxWorkers;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
         var createCluster = new com.databricks.sdk.service.compute.CreateCluster()
-                .setClusterName(runContext.render(clusterName).as(String.class).orElseThrow())
-                .setSparkVersion(runContext.render(sparkVersion).as(String.class).orElseThrow())
-                .setNodeTypeId(runContext.render(nodeTypeId).as(String.class).orElse(null))
-                .setAutoterminationMinutes(runContext.render(autoTerminationMinutes).as(Long.class).orElse(null))
-                .setNumWorkers(runContext.render(numWorkers).as(Long.class).orElse(null));
+            .setClusterName(runContext.render(clusterName).as(String.class).orElseThrow())
+            .setSparkVersion(runContext.render(sparkVersion).as(String.class).orElseThrow())
+            .setNodeTypeId(runContext.render(nodeTypeId).as(String.class).orElse(null))
+            .setAutoterminationMinutes(runContext.render(autoTerminationMinutes).as(Long.class).orElse(null))
+            .setNumWorkers(runContext.render(numWorkers).as(Long.class).orElse(null));
         if (minWorkers != null && maxWorkers != null) {
-            createCluster.setAutoscale(new AutoScale()
-                .setMinWorkers(runContext.render(minWorkers).as(Long.class).orElseThrow())
-                .setMaxWorkers(runContext.render(maxWorkers).as(Long.class).orElseThrow())
+            createCluster.setAutoscale(
+                new AutoScale()
+                    .setMinWorkers(runContext.render(minWorkers).as(Long.class).orElseThrow())
+                    .setMaxWorkers(runContext.render(maxWorkers).as(Long.class).orElseThrow())
             );
         }
 
@@ -112,13 +128,13 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "The cluster identifier.")
+        @Schema(title = "Cluster identifier")
         private String clusterId;
 
-        @Schema(title = "The cluster URI on the Databricks console.")
+        @Schema(title = "Cluster console URI")
         private URI clusterURI;
 
-        @Schema(title = "The cluster state.")
+        @Schema(title = "Cluster state")
         private State clusterState;
     }
 }

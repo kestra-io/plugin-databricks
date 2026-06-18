@@ -1,7 +1,5 @@
 package io.kestra.plugin.databricks.sql;
 
-import com.google.common.collect.ImmutableList;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.*;
@@ -12,6 +10,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.UUID;
+
+import com.google.common.collect.ImmutableList;
 
 //FIXME duplicated from io.kestra.plugin.jdbc.AbstractCellConverter
 abstract class AbstractCellConverter {
@@ -184,9 +184,11 @@ abstract class AbstractCellConverter {
             } else if (cls == Array.class) {
                 Collection<?> collection = ((Collection<?>) value);
 
-                ps.setArray(index, connection.createArrayOf(
-                    parameterType.getTypeName(index).substring(1),
-                    collection.toArray())
+                ps.setArray(
+                    index, connection.createArrayOf(
+                        parameterType.getTypeName(index).substring(1),
+                        collection.toArray()
+                    )
                 );
 
                 return ps;
@@ -243,12 +245,13 @@ abstract class AbstractCellConverter {
     }
 
     protected Exception addPreparedStatementException(ParameterType parameterType, int index, Object value, Throwable e) {
-        return new Exception("Unable to transform data with " +
-            "type '" + parameterType.getTypeName(index) + "', " +
-            "class '" + parameterType.getClass(index) + "', " +
-            "index '" + index + "', " +
-            "value '" + (value != null ? value.toString() : "null") + "', " +
-            "valueClass '" + (value != null ? value.getClass() : "null") + "'",
+        return new Exception(
+            "Unable to transform data with " +
+                "type '" + parameterType.getTypeName(index) + "', " +
+                "class '" + parameterType.getClass(index) + "', " +
+                "index '" + index + "', " +
+                "value '" + (value != null ? value.toString() : "null") + "', " +
+                "valueClass '" + (value != null ? value.getClass() : "null") + "'",
             e
         );
     }

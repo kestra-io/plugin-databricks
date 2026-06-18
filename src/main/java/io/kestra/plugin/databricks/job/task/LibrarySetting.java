@@ -1,32 +1,34 @@
 package io.kestra.plugin.databricks.job.task;
 
+import java.util.List;
+
 import com.databricks.sdk.service.compute.Library;
 import com.databricks.sdk.service.compute.MavenLibrary;
 import com.databricks.sdk.service.compute.PythonPyPiLibrary;
 import com.databricks.sdk.service.compute.RCranLibrary;
+
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
+
 import lombok.Builder;
 import lombok.Getter;
-
-import java.util.List;
 
 @Builder
 @Getter
 public class LibrarySetting {
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private CranSetting cran;
 
     private Property<String> egg;
 
     private Property<String> jar;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private MavenSetting maven;
 
-    @PluginProperty(dynamic = true)
+    @PluginProperty(dynamic = true, group = "advanced")
     private PypiSetting pypi;
 
     private Property<String> whl;
