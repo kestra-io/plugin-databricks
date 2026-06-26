@@ -27,21 +27,21 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 public abstract class AbstractTask extends Task {
-    @Schema(title = "Databricks host.")
+    @Schema(title = "Databricks host")
     @PluginProperty(group = "connection")
     private Property<String> host;
 
-    @Schema(title = "Databricks account identifier.")
+    @Schema(title = "Databricks account identifier")
     @PluginProperty(group = "advanced")
     private Property<String> accountId;
 
-    @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one.")
+    @Schema(title = "Databricks configuration file, use this if you don't want to configure each Databricks account properties one by one")
     @PluginProperty(group = "advanced")
     private Property<String> configFile;
 
     @PluginProperty(dynamic = true, group = "connection")
     @Schema(
-        title = "Databricks authentication configuration.",
+        title = "Databricks authentication configuration",
         description = """
             This property allows to configure the authentication to Databricks, different properties should be set depending on the type of authentication and the cloud provider.
             All configuration options can also be set using the standard Databricks environment variables.
