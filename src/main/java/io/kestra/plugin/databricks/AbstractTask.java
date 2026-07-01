@@ -83,21 +83,25 @@ public abstract class AbstractTask extends Task {
         private Property<String> authType;
 
         @Schema(title = "Databricks personal access token")
+        @PluginProperty(secret = true)
         private Property<String> token;
 
         @Schema(title = "Client ID")
         private Property<String> clientId;
 
         @Schema(title = "Client secret")
+        @PluginProperty(secret = true)
         private Property<String> clientSecret;
 
         @Schema(title = "Username")
         private Property<String> username;
 
         @Schema(title = "Password")
+        @PluginProperty(secret = true)
         private Property<String> password;
 
         @Schema(title = "Google credentials JSON")
+        @PluginProperty(secret = true)
         private Property<String> googleCredentials;
 
         @Schema(title = "Google service account email")
@@ -107,6 +111,7 @@ public abstract class AbstractTask extends Task {
         private Property<String> azureClientId;
 
         @Schema(title = "Azure client secret")
+        @PluginProperty(secret = true)
         private Property<String> azureClientSecret;
 
         @Schema(title = "Azure tenant ID")
