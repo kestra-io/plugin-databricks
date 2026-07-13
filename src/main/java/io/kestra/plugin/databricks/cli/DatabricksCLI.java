@@ -5,6 +5,7 @@ import java.util.List;
 import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.models.tasks.runners.TargetOS;
@@ -17,7 +18,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @Getter
@@ -28,7 +28,8 @@ import io.kestra.core.models.annotations.PluginProperty;
     title = "Run Databricks CLI commands",
     description = """
         Executes Databricks CLI statements inside the official CLI container (default `ghcr.io/databricks/cli:latest`).
-        Injects DATABRICKS_HOST and DATABRICKS_TOKEN as environment variables for each command.
+        Supports two authentication modes: PAT (via `databricksToken`) or OAuth M2M service principal
+        (via `clientId` + `clientSecret`). When `databricksToken` is set it always takes precedence.
         """
 )
 @Plugin(
@@ -68,6 +69,23 @@ import io.kestra.core.models.annotations.PluginProperty;
                     commands:
                       - databricks jobs run-now {{ inputs.jobId }} > files.txt
                 """
+        ),
+        @Example(
+            full = true,
+            title = "List Databricks clusters using OAuth M2M service principal",
+            code = """
+                id: databricks_cli_oauth
+                namespace: company.team
+
+                tasks:
+                  - id: list_clusters
+                    type: io.kestra.plugin.databricks.cli.DatabricksCLI
+                    databricksHost: "{{ secret('DATABRICKS_HOST') }}"
+                    clientId: "{{ secret('DATABRICKS_CLIENT_ID') }}"
+                    clientSecret: "{{ secret('DATABRICKS_CLIENT_SECRET') }}"
+                    commands:
+                      - databricks clusters list
+                """
         )
     }
 )
@@ -78,7 +96,7 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
     @PluginProperty(group = "execution")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
-    @Schema(title = "CLI commands to execute", description = "Commands run sequentially with host/token pre-set in the environment")
+    @Schema(title = "CLI commands to execute", description = "Commands run sequentially with host and auth vars pre-set in the environment")
     @NotNull
     @PluginProperty(group = "main")
     protected Property<List<String>> commands;
@@ -88,10 +106,29 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
     @PluginProperty(group = "main")
     protected Property<String> databricksHost;
 
-    @Schema(title = "Databricks personal access token", description = "PAT exported to DATABRICKS_TOKEN for each command; render from secrets")
-    @NotNull
+    @Schema(
+        title = "Databricks personal access token",
+        description = """
+            PAT exported to DATABRICKS_TOKEN for each command; render from secrets.
+            Use this for PAT-based auth. Takes precedence over `clientId`/`clientSecret` when both are set.
+            """
+    )
     @PluginProperty(secret = true, group = "main")
     protected Property<String> databricksToken;
+
+    @Schema(
+        title = "OAuth M2M client ID",
+        description = "Service principal client ID; exported to DATABRICKS_CLIENT_ID. Use with `clientSecret` as an alternative to `databricksToken`."
+    )
+    @PluginProperty(secret = true, group = "main")
+    protected Property<String> clientId;
+
+    @Schema(
+        title = "OAuth M2M client secret",
+        description = "Service principal secret; exported to DATABRICKS_CLIENT_SECRET. Render from secrets."
+    )
+    @PluginProperty(secret = true, group = "main")
+    protected Property<String> clientSecret;
 
     @Override
     protected DockerOptions injectDefaults(RunContext runContext, DockerOptions original) throws IllegalVariableEvaluationException {
@@ -105,15 +142,19 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
 
     @Override
     public ScriptOutput run(RunContext runContext) throws Exception {
-        TargetOS os = runContext.render(this.targetOS).as(TargetOS.class).orElse(null);
+        var rOs = runContext.render(this.targetOS).as(TargetOS.class).orElse(null);
 
-        String host = runContext.render(databricksHost).as(String.class).orElseThrow();
-        String token = runContext.render(databricksToken).as(String.class).orElseThrow();
+        var rHost = runContext.render(databricksHost).as(String.class).orElseThrow();
+        var rToken = runContext.render(databricksToken).as(String.class).orElse(null);
+        var rClientId = runContext.render(clientId).as(String.class).orElse(null);
+        var rClientSecret = runContext.render(clientSecret).as(String.class).orElse(null);
 
-        List<String> envCommands = runContext.render(commands)
+        var envPrefix = buildEnvPrefix(rHost, rToken, rClientId, rClientSecret);
+
+        var envCommands = runContext.render(commands)
             .asList(String.class)
             .stream()
-            .map(cmd -> String.format("DATABRICKS_HOST=%s DATABRICKS_TOKEN=%s %s", host, token, cmd))
+            .map(cmd -> envPrefix + " " + cmd)
             .toList();
 
         return this.commands(runContext)
@@ -121,7 +162,17 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
             .withBeforeCommands(beforeCommands)
             .withBeforeCommandsWithOptions(true)
             .withCommands(Property.ofValue(envCommands))
-            .withTargetOS(os)
+            .withTargetOS(rOs)
             .run();
+    }
+
+    String buildEnvPrefix(String host, String token, String clientId, String clientSecret) {
+        if (token != null) {
+            return String.format("DATABRICKS_HOST=%s DATABRICKS_TOKEN=%s", host, token);
+        } else if (clientId != null && clientSecret != null) {
+            return String.format("DATABRICKS_HOST=%s DATABRICKS_CLIENT_ID=%s DATABRICKS_CLIENT_SECRET=%s", host, clientId, clientSecret);
+        }
+        throw new IllegalArgumentException(
+            "DatabricksCLI requires authentication: set `databricksToken` (PAT) or both `clientId` and `clientSecret` (OAuth M2M).");
     }
 }

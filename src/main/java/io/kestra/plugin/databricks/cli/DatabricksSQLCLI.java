@@ -135,6 +135,8 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
         var renderedOutputFiles = runContext.render(this.outputFiles).asList(String.class);
 
+        String token = runContext.render(this.token).as(String.class).orElseThrow(() -> new IllegalArgumentException("Missing token"));
+
         List<String> databricksCommand = getDatabricksCommand(runContext);
 
         return new CommandsWrapper(runContext)
@@ -143,6 +145,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
             .withContainerImage("databricks-sql-cli")
             .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
             .withCommands(Property.ofValue(databricksCommand))
+            .withEnv(Map.of("DATABRICKS_TOKEN", token))
             .withInputFiles(inputFiles)
             .withOutputFiles(renderedOutputFiles.isEmpty() ? null : renderedOutputFiles)
             .run();
@@ -155,8 +158,7 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         String host = runContext.render(this.host).as(String.class).orElseThrow(() -> new IllegalArgumentException("Missing host"));
         commandBuilder.append(" --hostname ").append(host);
 
-        String token = runContext.render(this.token).as(String.class).orElseThrow(() -> new IllegalArgumentException("Missing token"));
-        commandBuilder.append(" --access-token ").append(token);
+        commandBuilder.append(" --access-token $DATABRICKS_TOKEN");
 
         String httpPath = runContext.render(this.httpPath).as(String.class).orElseThrow(() -> new IllegalArgumentException("Missing http-path"));
         commandBuilder.append(" --http-path ").append(httpPath);

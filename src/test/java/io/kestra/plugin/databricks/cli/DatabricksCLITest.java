@@ -18,19 +18,20 @@ import io.kestra.plugin.scripts.exec.scripts.models.ScriptOutput;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
-@DisabledIf(
-    value = "canNotBeEnabled",
-    disabledReason = "Disabled for CI/CD as requires secrets data: host, token"
-)
 public class DatabricksCLITest {
 
     @Inject
     private RunContextFactory runContextFactory;
 
     @Test
+    @DisabledIf(
+        value = "canNotBeEnabled",
+        disabledReason = "Disabled for CI/CD as requires secrets data: host, token"
+    )
     void run() throws Exception {
         var databricksCLI = DatabricksCLI.builder()
             .id(IdUtils.create())
@@ -45,6 +46,61 @@ public class DatabricksCLITest {
         ScriptOutput output = databricksCLI.run(runContext);
 
         assertThat(output.getExitCode(), is(0));
+    }
+
+    @Test
+    void buildEnvPrefix_patOnly() {
+        var task = DatabricksCLI.builder()
+            .id(IdUtils.create())
+            .type(DatabricksCLI.class.getName())
+            .build();
+
+        var prefix = task.buildEnvPrefix("https://host.databricks.com", "my-token", null, null);
+
+        assertThat(prefix, containsString("DATABRICKS_TOKEN=my-token"));
+        assertThat(prefix, containsString("DATABRICKS_HOST=https://host.databricks.com"));
+        assertThat(prefix, not(containsString("DATABRICKS_CLIENT_ID")));
+        assertThat(prefix, not(containsString("DATABRICKS_CLIENT_SECRET")));
+    }
+
+    @Test
+    void buildEnvPrefix_oauthM2m() {
+        var task = DatabricksCLI.builder()
+            .id(IdUtils.create())
+            .type(DatabricksCLI.class.getName())
+            .build();
+
+        var prefix = task.buildEnvPrefix("https://host.databricks.com", null, "client-id", "client-secret");
+
+        assertThat(prefix, containsString("DATABRICKS_CLIENT_ID=client-id"));
+        assertThat(prefix, containsString("DATABRICKS_CLIENT_SECRET=client-secret"));
+        assertThat(prefix, containsString("DATABRICKS_HOST=https://host.databricks.com"));
+        assertThat(prefix, not(containsString("DATABRICKS_TOKEN")));
+    }
+
+    @Test
+    void buildEnvPrefix_tokenTakesPrecedenceOverOauth() {
+        var task = DatabricksCLI.builder()
+            .id(IdUtils.create())
+            .type(DatabricksCLI.class.getName())
+            .build();
+
+        var prefix = task.buildEnvPrefix("https://host.databricks.com", "my-token", "client-id", "client-secret");
+
+        assertThat(prefix, containsString("DATABRICKS_TOKEN=my-token"));
+        assertThat(prefix, not(containsString("DATABRICKS_CLIENT_ID")));
+        assertThat(prefix, not(containsString("DATABRICKS_CLIENT_SECRET")));
+    }
+
+    @Test
+    void buildEnvPrefix_neitherThrows() {
+        var task = DatabricksCLI.builder()
+            .id(IdUtils.create())
+            .type(DatabricksCLI.class.getName())
+            .build();
+
+        assertThrows(IllegalArgumentException.class,
+            () -> task.buildEnvPrefix("https://host.databricks.com", null, null, null));
     }
 
     protected static boolean canNotBeEnabled() {
