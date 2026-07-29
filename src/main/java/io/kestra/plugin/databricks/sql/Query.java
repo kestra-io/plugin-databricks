@@ -75,8 +75,8 @@ import io.kestra.core.models.annotations.PluginProperty;
 @Schema(
     title = "Run a SQL query on Databricks",
     description = """
-        Executes a SQL statement on a Databricks cluster through the JDBC driver.
-        Renders connection values and SQL from the RunContext, then streams results to internal storage as an Ion text file.
+        Executes a SQL statement on a Databricks cluster or SQL warehouse through the JDBC driver.
+        Renders connection values and SQL from the RunContext, then streams results to internal storage as an ION text file.
         Arrow is disabled with the Databricks JDBC driver on Java 21, which may reduce fetch throughput.
         """
 )
@@ -238,7 +238,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     public static class Output implements io.kestra.core.models.tasks.Output {
         @Schema(
             title = "Result file URI",
-            description = "Internal storage URI of the Ion text file containing fetched rows"
+            description = "Internal storage URI of the ION text file containing fetched rows"
         )
         private final URI uri;
 

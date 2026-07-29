@@ -1,6 +1,6 @@
 @PluginSubGroup(
     title = "CLI",
-    description = "This sub-group of plugins contains tasks for executing Databricks SQL CLI commands.",
+    description = "This sub-group of plugins contains tasks for running Databricks CLI and Databricks SQL CLI commands.",
     categories = { PluginSubGroup.PluginCategory.DATA }
 )
 package io.kestra.plugin.databricks.cli;

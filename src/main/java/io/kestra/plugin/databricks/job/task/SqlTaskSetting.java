@@ -17,8 +17,10 @@ import lombok.Getter;
 @Builder
 @Getter
 public class SqlTaskSetting {
+    @Schema(title = "SQL warehouse ID", description = "ID of the Databricks SQL warehouse used to run the query.")
     private Property<String> warehouseId;
 
+    @Schema(title = "Query ID", description = "ID of an existing saved query in Databricks SQL to run.")
     private Property<String> queryId;
 
     @PluginProperty(dynamic = true, additionalProperties = String.class, group = "advanced")
