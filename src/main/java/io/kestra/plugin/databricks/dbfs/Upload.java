@@ -93,7 +93,7 @@ public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
             InputStream in = runContext.storage().getFile(URI.create(runContext.render(from).as(String.class).orElseThrow()));
             OutputStream out = workspace.dbfs().getOutputStream(path)
         ) {
-            int size = IOUtils.copy(in, out);
+            long size = IOUtils.copyLarge(in, out);
             runContext.metric(Counter.of("file.size", size));
         }
         return null;
