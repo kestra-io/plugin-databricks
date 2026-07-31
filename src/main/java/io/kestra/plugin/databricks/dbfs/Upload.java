@@ -65,7 +65,7 @@ import lombok.experimental.SuperBuilder;
 )
 @Schema(
     title = "Upload a file to DBFS",
-    description = "Streams a file from Kestra internal storage to DBFS using 1 MB chunks; suited for large files."
+    description = "Streams a file from Kestra internal storage to DBFS; suited for large files."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(
