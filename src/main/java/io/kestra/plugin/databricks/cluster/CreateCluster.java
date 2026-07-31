@@ -7,6 +7,7 @@ import com.databricks.sdk.service.compute.State;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
@@ -20,7 +21,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 @SuperBuilder
 @ToString
@@ -73,7 +73,7 @@ public class CreateCluster extends AbstractTask implements RunnableTask<CreateCl
     private Property<String> nodeTypeId;
 
     @Schema(title = "Auto-termination minutes", description = "Idle timeout; cluster is terminated after this duration if set")
-    @PluginProperty(group = "destination")
+    @PluginProperty(group = "advanced")
     private Property<Long> autoTerminationMinutes;
 
     @Schema(

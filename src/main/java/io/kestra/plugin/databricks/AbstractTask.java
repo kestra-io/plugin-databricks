@@ -19,7 +19,7 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 /**
- * For more info of using the Databricks SDK, see <a href="https://github.com/databricks/databricks-sdk-java">Databricks SQK</a>
+ * For more info on using the Databricks SDK, see <a href="https://github.com/databricks/databricks-sdk-java">Databricks SDK</a>
  */
 @SuperBuilder
 @ToString
