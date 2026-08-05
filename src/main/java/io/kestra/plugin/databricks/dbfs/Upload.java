@@ -48,7 +48,7 @@ import lombok.experimental.SuperBuilder;
                   - id: upload_file
                     type: io.kestra.plugin.databricks.dbfs.Upload
                     authentication:
-                    token: "{{ secret('DATABRICKS_TOKEN') }}"
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: "{{ secret('DATABRICKS_HOST') }}"
                     from: "{{ inputs.file }}"
                     to: /Share/myFile.parquet
@@ -65,7 +65,7 @@ import lombok.experimental.SuperBuilder;
 )
 @Schema(
     title = "Upload a file to DBFS",
-    description = "Streams a file from Kestra internal storage to DBFS using 1 MB chunks; suited for large files."
+    description = "Streams a file from Kestra internal storage to DBFS; suited for large files."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(

@@ -94,6 +94,7 @@ public class DatabricksCLI extends AbstractExecScript implements RunnableTask<Sc
 
     @Builder.Default
     @PluginProperty(group = "execution")
+    @Schema(title = "Container image", description = "Container image used to run the Databricks CLI; defaults to `ghcr.io/databricks/cli:latest`.")
     protected Property<String> containerImage = Property.ofValue(DEFAULT_IMAGE);
 
     @Schema(title = "CLI commands to execute", description = "Commands run sequentially with host and auth vars pre-set in the environment")

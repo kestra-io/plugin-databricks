@@ -35,7 +35,7 @@ import io.kestra.core.models.annotations.PluginProperty;
                   - id: delete_cluster
                     type: io.kestra.plugin.databricks.cluster.DeleteCluster
                     authentication:
-                      token: <your-token>
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: <your-host>
                     clusterId: <your-cluster>
                 """

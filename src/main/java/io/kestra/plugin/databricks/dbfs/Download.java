@@ -62,7 +62,7 @@ import io.kestra.core.models.annotations.PluginProperty;
 )
 @Schema(
     title = "Download a file from DBFS",
-    description = "Streams a DBFS file to a temp file in Kestra internal storage using 1 MB chunks; returns the storage URI."
+    description = "Streams a DBFS file to a temp file in Kestra internal storage and returns the storage URI."
 )
 public class Download extends AbstractTask implements RunnableTask<Download.Output> {
     @Schema(

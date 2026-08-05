@@ -20,6 +20,7 @@ import lombok.Getter;
 public class SparkPythonTaskSetting {
 
     @NotNull
+    @Schema(title = "Python file", description = "Path or URI of the Python file to run (for example a workspace path or a cloud storage/DBFS URI). Required.")
     private Property<String> pythonFile;
 
     @PluginProperty(dynamic = true, group = "advanced")
@@ -31,6 +32,7 @@ public class SparkPythonTaskSetting {
     private Object parameters;
 
     @NotNull
+    @Schema(title = "Python file source", description = "Where the Python file lives: `WORKSPACE` or `GIT`. Required.")
     private Property<Source> sparkPythonTaskSource;
 
     public SparkPythonTask toSparkPythonTask(RunContext runContext) throws IllegalVariableEvaluationException {

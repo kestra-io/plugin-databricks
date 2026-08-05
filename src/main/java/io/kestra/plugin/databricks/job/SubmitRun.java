@@ -127,9 +127,11 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
     @Getter
     public static class RunSubmitTaskSetting {
         @PluginProperty(dynamic = true)
+        @Schema(title = "Existing cluster ID", description = "ID of an existing Databricks cluster to run this task on.")
         private String existingClusterId;
 
         @PluginProperty(dynamic = true)
+        @Schema(title = "Task key", description = "Unique key for this task; required when multiple tasks are defined so dependsOn can reference it.")
         private String taskKey;
 
         @PluginProperty

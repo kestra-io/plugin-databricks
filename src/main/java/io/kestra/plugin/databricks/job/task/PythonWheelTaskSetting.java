@@ -17,6 +17,7 @@ import lombok.Getter;
 @Builder
 @Getter
 public class PythonWheelTaskSetting {
+    @Schema(title = "Entry point", description = "Named entry point (function or `package.module:function`) to run from the installed Python wheel.")
     private Property<String> entryPoint;
 
     @PluginProperty(dynamic = true, group = "advanced")
@@ -35,6 +36,7 @@ public class PythonWheelTaskSetting {
     )
     private Object namedParameters;
 
+    @Schema(title = "Package name", description = "Name of the installed Python wheel package that contains the entry point.")
     private Property<String> packageName;
 
     public PythonWheelTask toPythonWheelTask(RunContext runContext) throws IllegalVariableEvaluationException {

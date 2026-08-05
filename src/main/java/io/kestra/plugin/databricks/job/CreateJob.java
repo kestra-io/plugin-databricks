@@ -49,6 +49,7 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                     authentication:
                       token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: "{{ secret('DATABRICKS_HOST') }}"
+                    jobName: my-databricks-job
                     jobTasks:
                       - existingClusterId: <your-cluster>
                         taskKey: taskKey
@@ -64,11 +65,11 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
     title = "Create and run a Databricks job",
     description = """
         Creates a Databricks job with one or more tasks, submits it immediately, and optionally waits for completion.
-        Use numWorkers/cluster settings inside each task; set waitForCompletion (ISO-8601 duration) to block until the run ends.
+        Reuse a compute cluster per task with existingClusterId; set waitForCompletion (ISO-8601 duration) to block until the run ends.
         """
 )
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
-    @Schema(title = "Job name")
+    @Schema(title = "Job name", description = "Required.")
     @PluginProperty(group = "advanced")
     private Property<String> jobName;
 
@@ -140,7 +141,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         @Schema(title = "Task description")
         private Property<String> description;
 
-        @Schema(title = "Existing cluster ID", description = "Cluster to reuse for this task; omit to use task-specific settings")
+        @Schema(title = "Existing cluster ID", description = "ID of an existing Databricks cluster to run this task on.")
         private Property<String> existingClusterId;
 
         @Schema(title = "Task key", description = "Unique key per task; required when multiple tasks are defined")
