@@ -9,12 +9,17 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
 import lombok.Getter;
 
 @Builder
 @Getter
 public class RunJobTaskSetting {
+    @Schema(title = "Job identifier", description = "Numeric identifier of the existing Databricks job to run")
+    @NotNull
+    @PluginProperty(group = "main")
     private Property<String> jobId;
 
     @PluginProperty(dynamic = true, group = "advanced")
@@ -22,8 +27,18 @@ public class RunJobTaskSetting {
 
     public RunJobTask toRunJobTask(RunContext runContext) throws IllegalVariableEvaluationException {
         Map<String, String> renderedJobParameters = ParametersUtils.mapParameters(runContext, jobParameters);
+        var rJobId = runContext.render(jobId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("The `jobId` property of `runJobTask` is required, set it to the identifier of the Databricks job to run"));
+
+        long parsedJobId;
+        try {
+            parsedJobId = Long.parseLong(rJobId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("The `jobId` property of `runJobTask` must be a number, but was '" + rJobId + "'", e);
+        }
+
         return new RunJobTask()
-            .setJobId(Long.parseLong(runContext.render(jobId).as(String.class).orElseThrow()))
+            .setJobId(parsedJobId)
             .setJobParameters(renderedJobParameters);
     }
 }

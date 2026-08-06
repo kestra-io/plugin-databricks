@@ -12,7 +12,9 @@ import com.google.api.client.util.Strings;
 import com.google.common.collect.ImmutableMap;
 
 import io.kestra.core.junit.annotations.KestraTest;
+import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
+import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.storages.StorageInterface;
 import io.kestra.core.tenant.TenantService;
@@ -23,6 +25,7 @@ import io.kestra.plugin.databricks.AbstractTask;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 
 @KestraTest
@@ -42,19 +45,19 @@ class UploadTest {
 
     @Test
     void run() throws Exception {
+        File sourceFile = new File(
+            Objects.requireNonNull(
+                UploadTest.class.getClassLoader()
+                    .getResource("test.txt")
+            )
+                .toURI()
+        );
+
         URI source = storageInterface.put(
             TenantService.MAIN_TENANT,
             null,
             new URI("/" + IdUtils.create()),
-            new FileInputStream(
-                new File(
-                    Objects.requireNonNull(
-                        UploadTest.class.getClassLoader()
-                            .getResource("test.txt")
-                    )
-                        .toURI()
-                )
-            )
+            new FileInputStream(sourceFile)
         );
 
         var task = Upload.builder()
@@ -71,6 +74,17 @@ class UploadTest {
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output, nullValue());
+        assertThat(fileSizeMetric(runContext), is((double) sourceFile.length()));
+    }
+
+    private static Double fileSizeMetric(RunContext runContext) {
+        return runContext.metrics().stream()
+            .filter(Counter.class::isInstance)
+            .map(Counter.class::cast)
+            .filter(counter -> "file.size".equals(counter.getName()))
+            .map(Counter::getValue)
+            .findFirst()
+            .orElseThrow();
     }
 
     protected static boolean canNotBeEnabled() {
