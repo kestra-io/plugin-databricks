@@ -107,13 +107,13 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         )
             .toList();
 
-        var renderedJobName = runContext.render(jobName).as(String.class)
+        var rJobName = runContext.render(jobName).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("The `jobName` property is required, set it to the name of the Databricks job to create"));
 
         var workspaceClient = workspaceClient(runContext);
         var job = workspaceClient.jobs().create(
             new com.databricks.sdk.service.jobs.CreateJob()
-                .setName(renderedJobName)
+                .setName(rJobName)
                 .setTasks(tasks)
         );
         var jobURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId());

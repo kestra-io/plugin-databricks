@@ -27,14 +27,14 @@ public class RunJobTaskSetting {
 
     public RunJobTask toRunJobTask(RunContext runContext) throws IllegalVariableEvaluationException {
         Map<String, String> renderedJobParameters = ParametersUtils.mapParameters(runContext, jobParameters);
-        var renderedJobId = runContext.render(jobId).as(String.class)
+        var rJobId = runContext.render(jobId).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("The `jobId` property of `runJobTask` is required, set it to the identifier of the Databricks job to run"));
 
         long parsedJobId;
         try {
-            parsedJobId = Long.parseLong(renderedJobId);
+            parsedJobId = Long.parseLong(rJobId);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("The `jobId` property of `runJobTask` must be a number, but was '" + renderedJobId + "'", e);
+            throw new IllegalArgumentException("The `jobId` property of `runJobTask` must be a number, but was '" + rJobId + "'", e);
         }
 
         return new RunJobTask()
