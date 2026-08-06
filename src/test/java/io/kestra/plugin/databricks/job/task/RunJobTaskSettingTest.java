@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @KestraTest
@@ -19,6 +20,19 @@ class RunJobTaskSettingTest {
 
     @Inject
     private RunContextFactory runContextFactory;
+
+    @Test
+    void validJobId() throws Exception {
+        var setting = RunJobTaskSetting.builder()
+            .jobId(Property.ofValue("12345"))
+            .jobParameters(ImmutableMap.of("key", "value"))
+            .build();
+
+        var runJobTask = setting.toRunJobTask(runContextFactory.of(ImmutableMap.of()));
+
+        assertThat(runJobTask.getJobId(), is(12345L));
+        assertThat(runJobTask.getJobParameters(), is(ImmutableMap.of("key", "value")));
+    }
 
     @Test
     void missingJobId() {
