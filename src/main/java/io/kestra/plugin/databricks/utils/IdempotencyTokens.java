@@ -3,10 +3,10 @@ package io.kestra.plugin.databricks.utils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 public final class IdempotencyTokens {
     private IdempotencyTokens() {
-        //utility class pattern
     }
 
     /**
@@ -18,11 +18,7 @@ public final class IdempotencyTokens {
         try {
             var digest = MessageDigest.getInstance("SHA-256")
                 .digest((seed + ":" + generation).getBytes(StandardCharsets.UTF_8));
-            var hex = new StringBuilder(digest.length * 2);
-            for (byte b : digest) {
-                hex.append(String.format("%02x", b));
-            }
-            return hex.toString();
+            return HexFormat.of().formatHex(digest);
         } catch (NoSuchAlgorithmException e) {
             // SHA-256 is guaranteed to be available on every JVM implementation
             throw new IllegalStateException(e);

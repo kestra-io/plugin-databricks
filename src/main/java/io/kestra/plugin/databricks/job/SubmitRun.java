@@ -79,7 +79,6 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
 public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Output> {
     // Databricks terminal result states that mean "this run belongs to a previous, unsuccessful attempt of the same idempotency token"
     private static final Set<RunResultState> FAILED_RESULT_STATES = EnumSet.complementOf(EnumSet.of(RunResultState.SUCCESS, RunResultState.SUCCESS_WITH_FAILURES));
-    private static final Set<RunLifeCycleState> FRESH_LIFECYCLE_STATES = EnumSet.of(RunLifeCycleState.PENDING, RunLifeCycleState.QUEUED, RunLifeCycleState.BLOCKED);
     // Caps the idempotency token generation walk so a permanently broken taskrun fails fast instead of looping
     static final int MAX_IDEMPOTENCY_GENERATIONS = 10;
 
@@ -105,7 +104,7 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
             Set this only if you need to key deduplication on something other than the task run itself. Two different executions sharing the same override value will cause the second one to adopt the first one's run.
             """
     )
-    @PluginProperty(group = "advanced")
+    @PluginProperty(group = "reliability")
     private Property<String> idempotencyToken;
 
     @Override
@@ -150,11 +149,9 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
 
         var run = outcome.run();
         var runURI = runURI(rHost, run.getJobId(), run.getRunId());
-        if (outcome.adopted()) {
-            runContext.logger().info("Adopted existing Databricks run (state: {}): {}", run.getState(), runURI);
-        } else {
-            runContext.logger().info("Run submitted: {}", runURI);
-        }
+        // the run may have just been created or be one adopted from a lost worker's submission: the two are
+        // indistinguishable from here, so the log states the resolved run rather than guessing which happened
+        runContext.logger().info("Databricks run resolved at idempotency generation {} (state: {}): {}", outcome.generation(), run.getState(), runURI);
 
         if (waitForCompletion != null) {
             var time = runContext.render(waitForCompletion).as(Duration.class).orElseThrow();
@@ -182,28 +179,28 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
         Run lastFailedRun = null;
         for (var generation = 0; generation < MAX_IDEMPOTENCY_GENERATIONS; generation++) {
             var token = IdempotencyTokens.token(tokenSeed, generation);
-            Long runId;
+            Run run;
             try {
-                runId = submit.apply(token);
+                run = getRun.apply(submit.apply(token));
             } catch (NotFound e) {
-                // the run previously submitted with this token was deleted in Databricks; advance and retry
+                // the run previously submitted with this token was deleted in Databricks, either as seen by
+                // submit itself or in the window before getRun observes it; advance and retry
                 continue;
             }
 
-            var run = getRun.apply(runId);
             if (isFailedTerminal(run.getState())) {
                 lastFailedRun = run;
                 continue;
             }
 
-            return new IdempotentSubmitOutcome(run, generation, !isFreshLifecycle(run.getState()));
+            return new IdempotentSubmitOutcome(run, generation);
         }
 
         throw new IllegalStateException(
             "Too many prior failed Databricks runs (%d) found for task run '%s'; last run: %s. This taskrun may be stuck in a bad state — check the Databricks Jobs UI."
                 .formatted(
                     MAX_IDEMPOTENCY_GENERATIONS,
-                    tokenSeed,
+                    sanitizeSeed(tokenSeed),
                     lastFailedRun != null ? runURI(host, lastFailedRun.getJobId(), lastFailedRun.getRunId()) : "none (every submission returned a deleted-token error)"
                 )
         );
@@ -225,11 +222,16 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
         return result != null && FAILED_RESULT_STATES.contains(result);
     }
 
-    private static boolean isFreshLifecycle(RunState state) {
-        return state != null && FRESH_LIFECYCLE_STATES.contains(state.getLifeCycleState());
+    /**
+     * The seed can be a user-supplied override with no format constraint, and it ends up in the task logs:
+     * keep it single-line and bounded so a pasted value cannot inject control characters into the log stream.
+     */
+    private static String sanitizeSeed(String tokenSeed) {
+        var oneLine = tokenSeed.replaceAll("\\p{Cntrl}", " ");
+        return oneLine.length() <= 100 ? oneLine : oneLine.substring(0, 100) + "...";
     }
 
-    record IdempotentSubmitOutcome(Run run, int generation, boolean adopted) {
+    record IdempotentSubmitOutcome(Run run, int generation) {
     }
 
     @Builder

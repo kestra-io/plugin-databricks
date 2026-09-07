@@ -29,7 +29,6 @@ class SubmitRunIdempotencyTest {
         var outcome = SubmitRun.submitIdempotent(TASK_RUN_ID, HOST, submitOf(runs), getRunOf(runs));
 
         assertThat(outcome.generation(), is(0));
-        assertThat(outcome.adopted(), is(true));
         assertThat(outcome.run().getRunId(), is(1L));
     }
 
@@ -40,7 +39,6 @@ class SubmitRunIdempotencyTest {
         var outcome = SubmitRun.submitIdempotent(TASK_RUN_ID, HOST, submitOf(runs), getRunOf(runs));
 
         assertThat(outcome.generation(), is(0));
-        assertThat(outcome.adopted(), is(true));
     }
 
     @Test
@@ -53,7 +51,6 @@ class SubmitRunIdempotencyTest {
         var outcome = SubmitRun.submitIdempotent(TASK_RUN_ID, HOST, submitOf(runs), getRunOf(runs));
 
         assertThat(outcome.generation(), is(1));
-        assertThat(outcome.adopted(), is(false));
         assertThat(outcome.run().getRunId(), is(2L));
     }
 
@@ -68,7 +65,6 @@ class SubmitRunIdempotencyTest {
         var outcome = SubmitRun.submitIdempotent(TASK_RUN_ID, HOST, submitOf(runs), getRunOf(runs));
 
         assertThat(outcome.generation(), is(2));
-        assertThat(outcome.adopted(), is(false));
         assertThat(outcome.run().getRunId(), is(3L));
     }
 
