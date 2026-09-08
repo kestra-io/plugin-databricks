@@ -65,6 +65,12 @@ class SubmitRunTest {
         var runContext = TestsUtils.mockRunContext(runContextFactory, task, ImmutableMap.of());
         var output = task.run(runContext);
         assertThat(output.getRunId(), notNullValue());
+        assertThat(output.getRunURI(), notNullValue());
+        assertThat(output.getLifeCycleState(), notNullValue());
+        assertThat(output.getResultState(), notNullValue());
+        assertThat(output.getStartTime(), notNullValue());
+        assertThat(output.getEndTime(), notNullValue());
+        assertThat(output.getDuration(), notNullValue());
     }
 
     protected static boolean canNotBeEnabled() {
