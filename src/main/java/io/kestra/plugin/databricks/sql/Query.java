@@ -23,6 +23,7 @@ import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.executions.metrics.Counter;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
@@ -38,7 +39,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.SuperBuilder;
-import io.kestra.core.models.annotations.PluginProperty;
 
 /**
  * For more information on the JDBC drivers see <a href="https://docs.databricks.com/integrations/jdbc-odbc-bi.html#jdbc-driver">JDBC Driver</a>.
@@ -97,7 +97,7 @@ public class Query extends Task implements RunnableTask<Query.Output> {
     private Property<String> httpPath;
 
     @Schema(title = "Catalog used for the connection", description = "Sets ConnCatalog on the JDBC URL when provided")
-    @PluginProperty(group = "advanced")
+    @PluginProperty(group = "connection")
     private Property<String> catalog;
 
     @Schema(title = "Schema used for the connection", description = "Sets ConnSchema on the JDBC URL when provided")

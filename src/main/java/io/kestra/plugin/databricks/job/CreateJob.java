@@ -68,8 +68,9 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
         """
 )
 public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Output> {
-    @Schema(title = "Job name")
-    @PluginProperty(group = "advanced")
+    @Schema(title = "Job name", description = "Name of the Databricks job to create; shown in the Databricks Jobs UI")
+    @NotNull
+    @PluginProperty(group = "main")
     private Property<String> jobName;
 
     @Schema(title = "Wait for completion", description = "If set, waits up to the given duration (e.g., PT1H) for the submitted run to finish")
@@ -106,10 +107,13 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         )
             .toList();
 
+        var rJobName = runContext.render(jobName).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("The `jobName` property is required, set it to the name of the Databricks job to create"));
+
         var workspaceClient = workspaceClient(runContext);
         var job = workspaceClient.jobs().create(
             new com.databricks.sdk.service.jobs.CreateJob()
-                .setName(runContext.render(jobName).as(String.class).orElseThrow())
+                .setName(rJobName)
                 .setTasks(tasks)
         );
         var jobURI = URI.create(workspaceClient.config().getHost() + "/#job/" + job.getJobId());
