@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-import com.databricks.sdk.service.jobs.Run;
 import com.databricks.sdk.service.jobs.RunNow;
 import com.databricks.sdk.service.jobs.Task;
 
@@ -13,12 +12,12 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Timer;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
+import io.kestra.plugin.databricks.utils.RunMetrics;
 import io.kestra.plugin.databricks.utils.RunOutputs;
 import io.kestra.plugin.databricks.utils.RunStateInfo;
 import io.kestra.plugin.databricks.utils.TaskUtils;
@@ -143,15 +142,16 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
             RunOutputs.logTaskOutputs(runContext, workspaceClient, run);
         }
 
-        var output = buildOutput(job.getJobId(), jobURI, run.getRunId(), runURI, run);
-        if (output.getDuration() != null) {
-            runContext.metric(Timer.of("run.duration", output.getDuration()));
+        var state = RunStateInfo.of(run);
+        RunMetrics.emitDurationMetric(runContext, state);
+        if (waitForCompletion != null) {
+            state.throwIfUnsuccessful(runURI);
         }
-        return output;
+
+        return buildOutput(job.getJobId(), jobURI, run.getRunId(), runURI, state);
     }
 
-    static Output buildOutput(Long jobId, URI jobURI, Long runId, URI runURI, Run run) {
-        var state = RunStateInfo.of(run);
+    static Output buildOutput(Long jobId, URI jobURI, Long runId, URI runURI, RunStateInfo state) {
         return Output.builder()
             .jobId(jobId)
             .jobURI(jobURI)

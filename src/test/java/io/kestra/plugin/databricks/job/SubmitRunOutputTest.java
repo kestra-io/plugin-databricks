@@ -6,10 +6,7 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 
-import com.databricks.sdk.service.jobs.Run;
-import com.databricks.sdk.service.jobs.RunLifeCycleState;
-import com.databricks.sdk.service.jobs.RunResultState;
-import com.databricks.sdk.service.jobs.RunState;
+import io.kestra.plugin.databricks.utils.RunStateInfo;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -17,25 +14,14 @@ import static org.hamcrest.Matchers.nullValue;
 
 class SubmitRunOutputTest {
     @Test
-    void buildOutputFromTerminatedRun() {
+    void buildOutputMapsRunStateInfoFields() {
         var runId = 123L;
         var runURI = URI.create("https://example.databricks.com/#job/1/run/123");
         var start = Instant.parse("2026-09-08T10:00:00Z");
         var end = Instant.parse("2026-09-08T10:05:00Z");
+        var state = new RunStateInfo("TERMINATED", "SUCCESS", "Run succeeded", start, end, Duration.ofMinutes(5));
 
-        var run = new Run()
-            .setRunId(runId)
-            .setStartTime(start.toEpochMilli())
-            .setEndTime(end.toEpochMilli())
-            .setRunDuration(Duration.between(start, end).toMillis())
-            .setState(
-                new RunState()
-                    .setLifeCycleState(RunLifeCycleState.TERMINATED)
-                    .setResultState(RunResultState.SUCCESS)
-                    .setStateMessage("Run succeeded")
-            );
-
-        var output = SubmitRun.buildOutput(runId, runURI, run);
+        var output = SubmitRun.buildOutput(runId, runURI, state);
 
         assertThat(output.getRunId(), is(runId));
         assertThat(output.getRunURI(), is(runURI));
@@ -48,26 +34,11 @@ class SubmitRunOutputTest {
     }
 
     @Test
-    void buildOutputFallsBackToComputedDurationWhenRunDurationMissing() {
-        var start = Instant.parse("2026-09-08T10:00:00Z");
-        var end = Instant.parse("2026-09-08T10:02:30Z");
-
-        var run = new Run()
-            .setRunId(456L)
-            .setStartTime(start.toEpochMilli())
-            .setEndTime(end.toEpochMilli());
-
-        var output = SubmitRun.buildOutput(456L, null, run);
-
-        assertThat(output.getDuration(), is(Duration.ofMinutes(2).plusSeconds(30)));
-    }
-
-    @Test
-    void buildOutputWithoutRunOnlyKeepsIdentifiers() {
+    void buildOutputWithEmptyStateOnlyKeepsIdentifiers() {
         var runId = 789L;
         var runURI = URI.create("https://example.databricks.com/#job/1/run/789");
 
-        var output = SubmitRun.buildOutput(runId, runURI, null);
+        var output = SubmitRun.buildOutput(runId, runURI, RunStateInfo.of(null));
 
         assertThat(output.getRunId(), is(runId));
         assertThat(output.getRunURI(), is(runURI));

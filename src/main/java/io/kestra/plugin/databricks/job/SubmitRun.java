@@ -20,13 +20,13 @@ import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
-import io.kestra.core.models.executions.metrics.Timer;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
 import io.kestra.plugin.databricks.utils.IdempotencyTokens;
+import io.kestra.plugin.databricks.utils.RunMetrics;
 import io.kestra.plugin.databricks.utils.RunOutputs;
 import io.kestra.plugin.databricks.utils.RunStateInfo;
 import io.kestra.plugin.databricks.utils.TaskUtils;
@@ -172,11 +172,13 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
             RunOutputs.logTaskOutputs(runContext, workspaceClient, run);
         }
 
-        var output = buildOutput(run.getRunId(), runURI, run);
-        if (output.getDuration() != null) {
-            runContext.metric(Timer.of("run.duration", output.getDuration()));
+        var state = RunStateInfo.of(run);
+        RunMetrics.emitDurationMetric(runContext, state);
+        if (waitForCompletion != null) {
+            state.throwIfUnsuccessful(runURI);
         }
-        return output;
+
+        return buildOutput(run.getRunId(), runURI, state);
     }
 
     private static URI runURI(String host, Long jobId, Long runId) {
@@ -249,8 +251,7 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
     record IdempotentSubmitOutcome(Run run, int generation) {
     }
 
-    static Output buildOutput(Long runId, URI runURI, Run run) {
-        var state = RunStateInfo.of(run);
+    static Output buildOutput(Long runId, URI runURI, RunStateInfo state) {
         return Output.builder()
             .runId(runId)
             .runURI(runURI)
