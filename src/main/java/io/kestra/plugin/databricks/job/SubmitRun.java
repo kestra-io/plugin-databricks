@@ -26,6 +26,7 @@ import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
 import io.kestra.plugin.databricks.utils.IdempotencyTokens;
+import io.kestra.plugin.databricks.utils.LogSanitizer;
 import io.kestra.plugin.databricks.utils.RunMetrics;
 import io.kestra.plugin.databricks.utils.RunOutputs;
 import io.kestra.plugin.databricks.utils.RunStateInfo;
@@ -244,7 +245,7 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
      * keep it single-line and bounded so a pasted value cannot inject control characters into the log stream.
      */
     private static String sanitizeSeed(String tokenSeed) {
-        var oneLine = tokenSeed.replaceAll("\\p{Cntrl}", " ");
+        var oneLine = LogSanitizer.stripControlChars(tokenSeed);
         return oneLine.length() <= 100 ? oneLine : oneLine.substring(0, 100) + "...";
     }
 
@@ -323,7 +324,7 @@ public class SubmitRun extends AbstractTask implements RunnableTask<SubmitRun.Ou
         @Schema(title = "Run console URI")
         private URI runURI;
 
-        @Schema(title = "Life cycle state", description = "The run's life cycle state (e.g. TERMINATED, SKIPPED); only set when waitForCompletion is used")
+        @Schema(title = "Life cycle state", description = "Set once the run has been submitted; only reaches a terminal value (e.g. TERMINATED, SKIPPED) when waitForCompletion is used")
         private String lifeCycleState;
 
         @Schema(title = "Result state", description = "The run's terminal result state (e.g. SUCCESS, FAILED, TIMEDOUT); only set when the run has terminated")

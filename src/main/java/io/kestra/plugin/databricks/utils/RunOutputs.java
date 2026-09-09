@@ -18,6 +18,10 @@ public final class RunOutputs {
     public static void logTaskOutputs(RunContext runContext, WorkspaceClient workspaceClient, Run run) {
         var taskRuns = run.getTasks();
         if (taskRuns == null || taskRuns.isEmpty()) {
+            // CreateJob and SubmitRun both always submit through the @NotEmpty multi-task list format, so
+            // taskRuns is never null/empty in practice; this call is purely defensive against the SDK
+            // returning tasks=null for some edge case, and will itself no-op since top-level output
+            // retrieval isn't supported for the multi-task format either.
             logTaskOutput(runContext, workspaceClient, run.getRunName(), run.getRunId());
             return;
         }
@@ -48,10 +52,10 @@ public final class RunOutputs {
         }
 
         if (runOutput.getLogs() != null) {
-            runContext.logger().info("Task '{}' logs: {}", taskKey, truncate(runOutput.getLogs()));
+            runContext.logger().info("Task '{}' logs: {}", taskKey, truncate(LogSanitizer.stripControlChars(runOutput.getLogs())));
         }
         if (runOutput.getError() != null) {
-            runContext.logger().warn("Task '{}' failed: {}", taskKey, truncate(runOutput.getError()));
+            runContext.logger().warn("Task '{}' failed: {}", taskKey, truncate(LogSanitizer.stripControlChars(runOutput.getError())));
         }
     }
 

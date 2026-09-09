@@ -241,7 +241,7 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         @Schema(title = "Run console URI")
         private URI runURI;
 
-        @Schema(title = "Life cycle state", description = "The run's life cycle state (e.g. TERMINATED, SKIPPED); only set when waitForCompletion is used")
+        @Schema(title = "Life cycle state", description = "Set once the run has been submitted; only reaches a terminal value (e.g. TERMINATED, SKIPPED) when waitForCompletion is used")
         private String lifeCycleState;
 
         @Schema(title = "Result state", description = "The run's terminal result state (e.g. SUCCESS, FAILED, TIMEDOUT); only set when the run has terminated")

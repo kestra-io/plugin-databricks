@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Set;
 
 import com.databricks.sdk.service.jobs.Run;
+import com.databricks.sdk.service.jobs.RunLifeCycleState;
 import com.databricks.sdk.service.jobs.RunResultState;
 
 /**
@@ -17,6 +18,10 @@ public record RunStateInfo(String lifeCycleState, String resultState, String sta
     // Defined independently from any idempotency-related result-state set: this only decides whether the
     // Kestra task itself should be reported as failed once the Databricks run has terminated.
     private static final Set<String> SUCCESS_RESULT_STATES = Set.of(RunResultState.SUCCESS.name(), RunResultState.SUCCESS_WITH_FAILURES.name());
+    // resultState is only populated once a run reaches TERMINATED; a run that ends in SKIPPED or
+    // INTERNAL_ERROR terminates with resultState == null and must still be reported as unsuccessful.
+    // Mirrors SubmitRun.isFailedTerminal(): keep both definitions in sync.
+    private static final Set<String> UNSUCCESSFUL_LIFECYCLE_STATES = Set.of(RunLifeCycleState.SKIPPED.name(), RunLifeCycleState.INTERNAL_ERROR.name());
 
     public static RunStateInfo of(Run run) {
         if (run == null) {
@@ -44,8 +49,14 @@ public record RunStateInfo(String lifeCycleState, String resultState, String sta
         return new RunStateInfo(lifeCycleState, resultState, stateMessage, start, end, durationMillis != null ? Duration.ofMillis(durationMillis) : null);
     }
 
-    /** True once the run has terminated in a result state other than SUCCESS/SUCCESS_WITH_FAILURES. */
+    /**
+     * True once the run has terminated in a result state other than SUCCESS/SUCCESS_WITH_FAILURES, or reached
+     * a SKIPPED/INTERNAL_ERROR life-cycle state — those two terminate without ever setting resultState.
+     */
     public boolean isUnsuccessful() {
+        if (lifeCycleState != null && UNSUCCESSFUL_LIFECYCLE_STATES.contains(lifeCycleState)) {
+            return true;
+        }
         return resultState != null && !SUCCESS_RESULT_STATES.contains(resultState);
     }
 

@@ -69,6 +69,18 @@ class RunOutputsTest {
     }
 
     @Test
+    void stripsControlCharactersFromLogsAndError() {
+        var jobsAPI = mock(JobsAPI.class);
+        when(jobsAPI.getRunOutput(1L)).thenReturn(new RunOutput().setLogs("line1\nline2\rinjected").setError("bad\u0007error"));
+        var logger = mock(Logger.class);
+
+        RunOutputs.logTaskOutputs(mockRunContext(logger), mockWorkspaceClient(jobsAPI), runWithOneTask(1L));
+
+        verify(logger).info(eq("Task '{}' logs: {}"), eq("t1"), eq("line1 line2 injected"));
+        verify(logger).warn(eq("Task '{}' failed: {}"), eq("t1"), eq("bad error"));
+    }
+
+    @Test
     void truncatesOversizedLogs() {
         var jobsAPI = mock(JobsAPI.class);
         var hugeLogs = "x".repeat(20_000);

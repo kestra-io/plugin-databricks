@@ -82,6 +82,32 @@ class RunStateInfoTest {
     }
 
     @Test
+    void isUnsuccessfulTrueForSkippedOrInternalErrorLifecycleWithNullResultState() {
+        assertThat(new RunStateInfo("SKIPPED", null, null, null, null, null).isUnsuccessful(), is(true));
+        assertThat(new RunStateInfo("INTERNAL_ERROR", null, null, null, null, null).isUnsuccessful(), is(true));
+    }
+
+    @Test
+    void throwIfUnsuccessfulThrowsForSkippedRunWithNullResultState() {
+        var runURI = URI.create("https://example.databricks.com/#job/1/run/1");
+        var state = new RunStateInfo("SKIPPED", null, "Run was skipped", null, null, null);
+
+        var e = assertThrows(IllegalStateException.class, () -> state.throwIfUnsuccessful(runURI));
+
+        assertThat(e.getMessage(), containsString(runURI.toString()));
+    }
+
+    @Test
+    void throwIfUnsuccessfulThrowsForInternalErrorRunWithNullResultState() {
+        var runURI = URI.create("https://example.databricks.com/#job/1/run/1");
+        var state = new RunStateInfo("INTERNAL_ERROR", null, "Cluster failed to launch", null, null, null);
+
+        var e = assertThrows(IllegalStateException.class, () -> state.throwIfUnsuccessful(runURI));
+
+        assertThat(e.getMessage(), containsString(runURI.toString()));
+    }
+
+    @Test
     void throwIfUnsuccessfulIsNoOpOnSuccess() {
         new RunStateInfo(null, "SUCCESS", null, null, null, null)
             .throwIfUnsuccessful(URI.create("https://example.databricks.com/#job/1/run/1"));
