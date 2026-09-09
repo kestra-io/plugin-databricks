@@ -2,12 +2,14 @@ package io.kestra.plugin.databricks.job;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 import com.databricks.sdk.service.jobs.RunNow;
 import com.databricks.sdk.service.jobs.Task;
 
 import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
@@ -15,6 +17,9 @@ import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.job.task.*;
+import io.kestra.plugin.databricks.utils.RunMetrics;
+import io.kestra.plugin.databricks.utils.RunOutputs;
+import io.kestra.plugin.databricks.utils.RunStateInfo;
 import io.kestra.plugin.databricks.utils.TaskUtils;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -57,6 +62,13 @@ import static io.kestra.core.utils.Rethrow.throwFunction;
                           sparkPythonTaskSource: WORKSPACE
                     waitForCompletion: PT5M
                 """
+        )
+    },
+    metrics = {
+        @Metric(
+            name = "run.duration",
+            type = "timer",
+            description = "The duration of the Databricks run, only available when waitForCompletion is set"
         )
     }
 )
@@ -126,15 +138,31 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
         if (waitForCompletion != null) {
             var waitTime = runContext.render(waitForCompletion).as(Duration.class).orElseThrow();
             runContext.logger().info("Waiting for job to be terminated or skipped for {}", waitTime);
-            workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(run.getRunId(), waitTime, null);
-            //FIXME fail with Retrieving the output of runs with multiple tasks is not supported. Please retrieve the output of each individual task run instead.
-            //            runContext.logger().info(workspaceClient.jobs().getRunOutput(run.getRunId()).getLogs());
-            //TODO when finished, we have a lot of info that we can send as outputs and metrics
+            run = workspaceClient.jobs().waitGetRunJobTerminatedOrSkipped(run.getRunId(), waitTime, null);
+            RunOutputs.logTaskOutputs(runContext, workspaceClient, run);
         }
 
+        var state = RunStateInfo.of(run);
+        RunMetrics.emitDurationMetric(runContext, state);
+        if (waitForCompletion != null) {
+            state.throwIfUnsuccessful(runURI);
+        }
+
+        return buildOutput(job.getJobId(), jobURI, run.getRunId(), runURI, state);
+    }
+
+    static Output buildOutput(Long jobId, URI jobURI, Long runId, URI runURI, RunStateInfo state) {
         return Output.builder()
-            .jobId(job.getJobId()).jobURI(jobURI)
-            .runId(run.getRunId()).runURI(runURI)
+            .jobId(jobId)
+            .jobURI(jobURI)
+            .runId(runId)
+            .runURI(runURI)
+            .lifeCycleState(state.lifeCycleState())
+            .resultState(state.resultState())
+            .stateMessage(state.stateMessage())
+            .startTime(state.startTime())
+            .endTime(state.endTime())
+            .duration(state.duration())
             .build();
     }
 
@@ -212,5 +240,23 @@ public class CreateJob extends AbstractTask implements RunnableTask<CreateJob.Ou
 
         @Schema(title = "Run console URI")
         private URI runURI;
+
+        @Schema(title = "Life cycle state", description = "Set once the run has been submitted; only reaches a terminal value (e.g. TERMINATED, SKIPPED) when waitForCompletion is used")
+        private String lifeCycleState;
+
+        @Schema(title = "Result state", description = "The run's terminal result state (e.g. SUCCESS, FAILED, TIMEDOUT); only set when the run has terminated")
+        private String resultState;
+
+        @Schema(title = "State message", description = "A human-readable description of the run's current state, useful to diagnose a non-SUCCESS result state")
+        private String stateMessage;
+
+        @Schema(title = "Start time", description = "When the run started executing; only set when the run has started")
+        private Instant startTime;
+
+        @Schema(title = "End time", description = "When the run finished executing; only set when the run has terminated")
+        private Instant endTime;
+
+        @Schema(title = "Duration", description = "The total run duration; only set when the run has terminated")
+        private Duration duration;
     }
 }
