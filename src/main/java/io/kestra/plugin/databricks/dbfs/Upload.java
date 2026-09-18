@@ -48,7 +48,7 @@ import lombok.experimental.SuperBuilder;
                   - id: upload_file
                     type: io.kestra.plugin.databricks.dbfs.Upload
                     authentication:
-                    token: "{{ secret('DATABRICKS_TOKEN') }}"
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
                     host: "{{ secret('DATABRICKS_HOST') }}"
                     from: "{{ inputs.file }}"
                     to: /Share/myFile.parquet

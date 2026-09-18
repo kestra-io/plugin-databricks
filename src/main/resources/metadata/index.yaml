@@ -2,7 +2,7 @@ group: io.kestra.plugin.databricks
 name: "databricks"
 title: "Databricks"
 description: "Databricks plugin for Kestra"
-body: ""
+body: "Orchestrate Databricks from Kestra: create and run jobs or submit ad-hoc runs (notebook, dbt, Spark, SQL, Delta Live Tables, and more), create and delete compute clusters, run SQL through the JDBC driver, upload and download DBFS files, and run Databricks CLI or SQL CLI commands. Authenticate with a personal access token, an OAuth service principal, or a CLI configuration file."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

@@ -16,8 +16,10 @@ import lombok.Getter;
 @Builder
 @Getter
 public class SparkJarTaskSetting {
+    @Schema(title = "JAR URI", description = "URI of the JAR to run; the JAR must already be available to the cluster (for example uploaded via a library).")
     private Property<String> jarUri;
 
+    @Schema(title = "Main class name", description = "Fully qualified name of the class containing the `main` method to execute.")
     private Property<String> mainClassName;
 
     @PluginProperty(dynamic = true, group = "advanced")
