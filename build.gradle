@@ -1,16 +1,14 @@
 plugins {
-    id 'io.kestra.gradle.repository-conventions' version '1.2.6'
-    id "io.kestra.gradle.plugin-doc-lint" version "1.2.6"
-    id 'io.kestra.gradle.spotless-conventions' version '1.2.6'
+    id 'io.kestra.gradle.repository-conventions' version '1.2.10'
+    id "io.kestra.gradle.plugin-doc-lint" version "1.2.10"
+    id 'io.kestra.gradle.spotless-conventions' version '1.2.10'
     id "com.vanniktech.maven.publish" version "0.37.0"
-    id "io.kestra.gradle.inject-bom-versions" version "1.2.6"
+    id "io.kestra.gradle.inject-bom-versions" version "1.2.10"
     id 'java-library'
     id "idea"
     id 'jacoco'
-    id "com.adarshr.test-logger" version "4.0.0"
     id "com.gradleup.shadow" version "9.6.1"
     id 'signing'
-    id "com.github.ben-manes.versions" version "0.56.0"
     id 'net.researchgate.release' version '3.1.0'
 }
 
@@ -54,7 +52,7 @@ dependencies {
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Databricks deps
-    api "com.databricks:databricks-sdk-java:0.136.0"
+    api "com.databricks:databricks-sdk-java:0.152.0"
     api "com.databricks:databricks-jdbc:3.4.2"
 }
 
@@ -64,15 +62,6 @@ dependencies {
  **********************************************************************************************************************/
 test {
     useJUnitPlatform()
-}
-
-testlogger {
-    theme "mocha-parallel"
-    showExceptions true
-    showFullStackTraces true
-    showStandardStreams true
-    showPassedStandardStreams false
-    showSkippedStandardStreams true
 }
 
 dependencies {
@@ -110,21 +99,6 @@ dependencies {
 dependencies {
     testImplementation enforcedPlatform("io.kestra:platform:$kestraVersion")
     testImplementation "io.qameta.allure:allure-junit5"
-}
-
-configurations {
-    agent {
-        canBeResolved = true
-        canBeConsumed = true
-    }
-}
-
-dependencies {
-    agent "org.aspectj:aspectjweaver:1.9.25.1"
-}
-
-test {
-    jvmArgs = [ "-javaagent:${configurations.agent.singleFile}" ]
 }
 
 /**********************************************************************************************************************\
