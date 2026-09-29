@@ -1,6 +1,6 @@
 @PluginSubGroup(
     title = "Genie",
-    description = "Ask a question to a Databricks Genie space and send a follow-up in the same conversation.",
+    description = "This sub-group of plugins contains tasks for asking questions to a Databricks Genie space.",
     categories = { PluginSubGroup.PluginCategory.AI }
 )
 package io.kestra.plugin.databricks.genie;

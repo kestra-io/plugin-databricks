@@ -1,5 +1,6 @@
 package io.kestra.plugin.databricks.genie;
 
+import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -8,9 +9,13 @@ import org.junit.jupiter.api.Test;
 
 import com.databricks.sdk.service.dashboards.GenieAPI;
 import com.databricks.sdk.service.dashboards.GenieAttachment;
+import com.databricks.sdk.service.dashboards.GenieCreateConversationMessageRequest;
+import com.databricks.sdk.service.dashboards.GenieGetMessageAttachmentQueryResultRequest;
 import com.databricks.sdk.service.dashboards.GenieGetMessageQueryResultResponse;
 import com.databricks.sdk.service.dashboards.GenieMessage;
 import com.databricks.sdk.service.dashboards.GenieQueryAttachment;
+import com.databricks.sdk.service.dashboards.GenieService;
+import com.databricks.sdk.service.dashboards.GenieStartConversationMessageRequest;
 import com.databricks.sdk.service.dashboards.GenieStartConversationResponse;
 import com.databricks.sdk.service.dashboards.MessageStatus;
 import com.databricks.sdk.service.dashboards.TextAttachment;
@@ -94,7 +99,7 @@ class GenieConversationTest {
             .setMessageId("msg-2")
             .setAttachments(List.of(new GenieAttachment().setText(new TextAttachment().setContent("By month next."))));
 
-        var output = GenieConversation.continueConversation(
+        var output = GenieConversation.followUp(
             new GenieAPI(fake.service()),
             "space-1",
             "conv-1",
@@ -179,5 +184,54 @@ class GenieConversationTest {
                 .setResult(new ResultData().setDataArray(List.of(List.of("emea", "10"))))
         );
         return fake;
+    }
+
+    static final class FakeGenie {
+        GenieStartConversationResponse started;
+        GenieMessage created;
+        GenieMessage completed;
+        GenieGetMessageQueryResultResponse queryResult;
+        String lastQuestion;
+        String lastConversationId;
+        GenieGetMessageAttachmentQueryResultRequest lastQueryRequest;
+        int queryResultCalls;
+
+        GenieService service() {
+            return (GenieService) Proxy.newProxyInstance(
+                GenieService.class.getClassLoader(),
+                new Class<?>[] { GenieService.class },
+                (proxy, method, args) ->
+                {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "FakeGenie";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == args[0];
+                            default -> null;
+                        };
+                    }
+                    return switch (method.getName()) {
+                        case "startConversation" -> {
+                            var request = (GenieStartConversationMessageRequest) args[0];
+                            lastQuestion = request.getContent();
+                            yield started;
+                        }
+                        case "createMessage" -> {
+                            var request = (GenieCreateConversationMessageRequest) args[0];
+                            lastQuestion = request.getContent();
+                            lastConversationId = request.getConversationId();
+                            yield created;
+                        }
+                        case "getMessage" -> completed;
+                        case "getMessageAttachmentQueryResult" -> {
+                            queryResultCalls++;
+                            lastQueryRequest = (GenieGetMessageAttachmentQueryResultRequest) args[0];
+                            yield queryResult;
+                        }
+                        default -> throw new UnsupportedOperationException(method.getName());
+                    };
+                }
+            );
+        }
     }
 }

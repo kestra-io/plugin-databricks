@@ -1,6 +1,6 @@
 # How to use the Databricks plugin
 
-Run jobs, manage clusters, execute SQL, and move files on Databricks from Kestra flows.
+Run jobs, manage clusters, execute SQL, ask Genie, and move files on Databricks from Kestra flows.
 
 ## Authentication
 
@@ -20,12 +20,4 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 
 `cli.DatabricksCLI` runs Databricks CLI commands in a container — set `commands` (the `host` and authentication are passed to the CLI via environment variables). `cli.DatabricksSQLCLI` runs SQL statements through the Databricks SQL CLI — set `commands` along with the connection properties, and use `outputFiles` to persist the CLI output.
 
-## Genie
-
-The Genie space has to exist before the flow runs. Create it in the Databricks UI or with the Genie management API, and attach a SQL warehouse plus the tables the space is allowed to query. These tasks do not create the space.
-
-`genie.AskQuestion` starts a conversation. Set `spaceId` and `question`. It blocks until Genie answers, or until `timeout` (an ISO-8601 duration; the default is 20 minutes). `genie.Continue` sends a follow-up: set `spaceId`, the previous `conversationId`, and the next `question`.
-
-Both tasks use the same `host` and `authentication` properties as the other workspace tasks. For a personal access token, set `authentication.token`.
-
-Outputs are `conversationId`, `messageId`, `text`, `query`, and `result`. A text-only answer is returned on `text`, and `query` and `result` stay unset. When Genie generates SQL, `query` is that SQL and `result` is the rows. Text is not copied into `query` or `result`.
+`genie.AskQuestion` asks a question of an existing Genie space — set `spaceId` and `question`. It blocks until Genie answers; `timeout` is an ISO-8601 duration (default 20 minutes). `genie.Continue` sends a follow-up — set `conversationId` from the previous task. The space has to exist first. A text answer is returned on `text`. Generated SQL is returned on `query` with rows on `result`; a text-only answer leaves those unset.

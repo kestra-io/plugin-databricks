@@ -1,8 +1,8 @@
 group: io.kestra.plugin.databricks.genie
 name: "genie"
 title: "Databricks Genie"
-description: "Tasks that ask a question to a Databricks Genie space."
-body: "Ask a plain-language question of an existing Genie space and wait for the answer. The space must already exist in the workspace, with a SQL warehouse and the curated tables Genie is allowed to query. `AskQuestion` starts a conversation. `Continue` sends a follow-up using the returned `conversationId`. A text answer is returned separately from generated SQL and the query result. Authenticate with the same workspace host and token as the other Databricks tasks."
+description: "Tasks that ask questions to a Databricks Genie space."
+body: "Ask a question of an existing Genie space, or send a follow-up with conversationId. The space must already exist. A text answer is returned on text; generated SQL is returned on query with its rows on result."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

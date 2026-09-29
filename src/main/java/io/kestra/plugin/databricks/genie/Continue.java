@@ -1,10 +1,9 @@
 package io.kestra.plugin.databricks.genie;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
-import com.databricks.sdk.service.dashboards.GenieAPI;
-
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -15,6 +14,7 @@ import io.kestra.plugin.databricks.AbstractTask;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,28 +29,28 @@ import lombok.experimental.SuperBuilder;
 @Plugin(
     examples = {
         @Example(
-            title = "Ask a follow-up in the same Genie conversation.",
+            title = "Send a follow-up in the same Genie conversation.",
             full = true,
             code = """
-                id: genie_follow_up
+                id: databricks_genie_follow_up
                 namespace: company.team
 
                 tasks:
-                  - id: ask_initial
+                  - id: ask_question
                     type: io.kestra.plugin.databricks.genie.AskQuestion
                     authentication:
                       token: "{{ secret('DATABRICKS_TOKEN') }}"
-                    host: "{{ secret('DATABRICKS_HOST') }}"
-                    spaceId: 01ef8b2f3a9c1a2d9b7e5f6a1b2c3d4e
+                    host: <your-host>
+                    spaceId: <your-space>
                     question: What was total revenue by region last quarter?
 
-                  - id: ask_followup
+                  - id: follow_up
                     type: io.kestra.plugin.databricks.genie.Continue
                     authentication:
                       token: "{{ secret('DATABRICKS_TOKEN') }}"
-                    host: "{{ secret('DATABRICKS_HOST') }}"
-                    spaceId: 01ef8b2f3a9c1a2d9b7e5f6a1b2c3d4e
-                    conversationId: "{{ outputs.ask_initial.conversationId }}"
+                    host: <your-host>
+                    spaceId: <your-space>
+                    conversationId: "{{ outputs.ask_question.conversationId }}"
                     question: Now break that down by month.
                 """
         )
@@ -59,54 +59,66 @@ import lombok.experimental.SuperBuilder;
 @Schema(
     title = "Continue a Genie conversation",
     description = """
-        Sends a follow-up question on an existing Genie conversation and blocks until Genie answers.
-        Use the conversationId from AskQuestion. Outputs match AskQuestion: text stays separate from generated SQL and its result.
+        Sends a follow-up on an existing Genie conversation and waits until Genie answers.
+        Use the conversationId from AskQuestion. Outputs match AskQuestion.
         """
 )
-public class Continue extends AbstractTask implements RunnableTask<GenieOutput> {
+public class Continue extends AbstractTask implements RunnableTask<Continue.Output> {
     @NotNull
-    @Schema(
-        title = "Genie space identifier",
-        description = "Identifier of the existing Genie space that owns the conversation."
-    )
+    @Schema(title = "Genie space", description = "ID of an existing Genie space")
     @PluginProperty(group = "main")
     private Property<String> spaceId;
 
     @NotNull
-    @Schema(title = "Conversation identifier", description = "conversationId returned by AskQuestion or a previous Continue.")
+    @Schema(title = "Conversation identifier", description = "conversationId from AskQuestion or a previous Continue")
     @PluginProperty(group = "main")
     private Property<String> conversationId;
 
     @NotNull
-    @Schema(title = "Question", description = "Follow-up question sent on the existing conversation.")
+    @Schema(title = "Question")
     @PluginProperty(group = "main")
     private Property<String> question;
 
-    @Schema(
-        title = "Time to wait for Genie",
-        description = "ISO-8601 duration. The task polls until Genie completes or this elapses. Defaults to 20 minutes."
-    )
+    @Schema(title = "Timeout", description = "How long to wait for Genie, as an ISO-8601 duration. Defaults to 20 minutes.")
     @PluginProperty(group = "main")
     private Property<Duration> timeout;
 
     @Override
-    public GenieOutput run(RunContext runContext) throws Exception {
-        return answer(runContext, genieApi(runContext));
-    }
-
-    GenieOutput answer(RunContext runContext, GenieAPI genie) throws Exception {
-        var output = GenieConversation.continueConversation(
-            genie,
+    public Output run(RunContext runContext) throws Exception {
+        var reply = GenieConversation.followUp(
+            workspaceClient(runContext).genie(),
             runContext.render(spaceId).as(String.class).orElseThrow(),
             runContext.render(conversationId).as(String.class).orElseThrow(),
             runContext.render(question).as(String.class).orElseThrow(),
             timeout == null ? null : runContext.render(timeout).as(Duration.class).orElse(null)
         );
-        runContext.logger().info("Genie conversation {} message {} answered", output.getConversationId(), output.getMessageId());
-        return output;
+        runContext.logger().info("Genie conversation {} message {} answered", reply.getConversationId(), reply.getMessageId());
+
+        return Output.builder()
+            .conversationId(reply.getConversationId())
+            .messageId(reply.getMessageId())
+            .text(reply.getText())
+            .query(reply.getQuery())
+            .result(reply.getResult())
+            .build();
     }
 
-    GenieAPI genieApi(RunContext runContext) throws IllegalVariableEvaluationException {
-        return workspaceClient(runContext).genie();
+    @Builder
+    @Getter
+    public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "Conversation identifier", description = "Pass this to Continue for a follow-up")
+        private String conversationId;
+
+        @Schema(title = "Message identifier")
+        private String messageId;
+
+        @Schema(title = "Text answer", description = "Set when Genie replies with text. Unset when the answer is SQL only.")
+        private String text;
+
+        @Schema(title = "Generated SQL", description = "SQL Genie produced. Unset for a text-only answer.")
+        private String query;
+
+        @Schema(title = "Query result", description = "Rows for the generated SQL, keyed by column name. Unset for a text-only answer.")
+        private List<Map<String, String>> result;
     }
 }

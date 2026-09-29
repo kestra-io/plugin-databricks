@@ -19,16 +19,17 @@ import com.databricks.sdk.service.sql.ColumnInfo;
 import com.databricks.sdk.service.sql.ResultManifest;
 import com.databricks.sdk.service.sql.StatementResponse;
 
-/**
- * Blocks on the Genie SDK wait until a message completes, then splits a text answer from generated SQL.
- */
+import lombok.Builder;
+import lombok.Getter;
+
 final class GenieConversation {
-    static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(20);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(20);
 
     private GenieConversation() {
+        //utility class pattern
     }
 
-    static GenieOutput ask(GenieAPI genie, String spaceId, String question, Duration timeout) throws TimeoutException {
+    static Reply ask(GenieAPI genie, String spaceId, String question, Duration timeout) throws TimeoutException {
         var request = new GenieStartConversationMessageRequest()
             .setSpaceId(spaceId)
             .setContent(question);
@@ -38,12 +39,7 @@ final class GenieConversation {
         return fromMessage(genie, spaceId, message, started.getConversationId(), started.getMessageId());
     }
 
-    static GenieOutput continueConversation(
-        GenieAPI genie,
-        String spaceId,
-        String conversationId,
-        String question,
-        Duration timeout) throws TimeoutException {
+    static Reply followUp(GenieAPI genie, String spaceId, String conversationId, String question, Duration timeout) throws TimeoutException {
         var request = new GenieCreateConversationMessageRequest()
             .setSpaceId(spaceId)
             .setConversationId(conversationId)
@@ -60,12 +56,7 @@ final class GenieConversation {
         );
     }
 
-    static GenieOutput fromMessage(
-        GenieAPI genie,
-        String spaceId,
-        GenieMessage message,
-        String fallbackConversationId,
-        String fallbackMessageId) {
+    private static Reply fromMessage(GenieAPI genie, String spaceId, GenieMessage message, String fallbackConversationId, String fallbackMessageId) {
         if (message == null) {
             throw new IllegalStateException("Genie returned no message");
         }
@@ -83,7 +74,6 @@ final class GenieConversation {
                     }
                     textParts.append(attachment.getText().getContent());
                 }
-                // ponytail: first query attachment only. Upgrade path: return one output per attachment.
                 if (queryAttachment == null && attachment.getQuery() != null) {
                     queryAttachment = attachment;
                 }
@@ -100,7 +90,7 @@ final class GenieConversation {
             result = queryResult(genie, spaceId, conversationId, messageId, queryAttachment);
         }
 
-        return GenieOutput.builder()
+        return Reply.builder()
             .conversationId(conversationId)
             .messageId(messageId)
             .text(text)
@@ -130,7 +120,7 @@ final class GenieConversation {
 
     private static List<Map<String, String>> rows(StatementResponse statement) {
         var data = statement.getResult() == null ? null : statement.getResult().getDataArray();
-        // ponytail: one inline chunk. Upgrade path: follow ResultData.nextChunkIndex.
+        // A further chunk or a truncated manifest would drop rows, so fail instead of returning a partial result.
         if (statement.getResult() != null && statement.getResult().getNextChunkIndex() != null) {
             throw new IllegalStateException("Genie query result has more chunks than this task reads");
         }
@@ -142,7 +132,7 @@ final class GenieConversation {
         }
 
         var columns = columnNames(statement.getManifest());
-        var rows = new ArrayList<Map<String, String>>();
+        var mappedRows = new ArrayList<Map<String, String>>();
         for (Collection<String> row : data) {
             var mapped = new LinkedHashMap<String, String>();
             var index = 0;
@@ -153,9 +143,9 @@ final class GenieConversation {
                     index++;
                 }
             }
-            rows.add(mapped);
+            mappedRows.add(mapped);
         }
-        return rows;
+        return mappedRows;
     }
 
     private static List<String> columnNames(ResultManifest manifest) {
@@ -185,5 +175,15 @@ final class GenieConversation {
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    @Builder
+    @Getter
+    static class Reply {
+        private String conversationId;
+        private String messageId;
+        private String text;
+        private String query;
+        private List<Map<String, String>> result;
     }
 }
