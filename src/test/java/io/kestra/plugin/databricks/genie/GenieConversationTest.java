@@ -17,6 +17,7 @@ import com.databricks.sdk.service.dashboards.GenieQueryAttachment;
 import com.databricks.sdk.service.dashboards.GenieService;
 import com.databricks.sdk.service.dashboards.GenieStartConversationMessageRequest;
 import com.databricks.sdk.service.dashboards.GenieStartConversationResponse;
+import com.databricks.sdk.service.dashboards.MessageError;
 import com.databricks.sdk.service.dashboards.MessageStatus;
 import com.databricks.sdk.service.dashboards.TextAttachment;
 import com.databricks.sdk.service.sql.ColumnInfo;
@@ -26,6 +27,7 @@ import com.databricks.sdk.service.sql.ResultSchema;
 import com.databricks.sdk.service.sql.StatementResponse;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,7 +45,7 @@ class GenieConversationTest {
                 )
             );
 
-        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "How was revenue?", null);
+        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "How was revenue?", null, GenieConversation.DEFAULT_MAX_ROWS);
 
         assertThat(output.getConversationId(), is("conv-1"));
         assertThat(output.getMessageId(), is("msg-1"));
@@ -65,7 +67,7 @@ class GenieConversationTest {
             )
         );
 
-        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "Revenue by region?", Duration.ofMinutes(2));
+        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "Revenue by region?", Duration.ofMinutes(2), GenieConversation.DEFAULT_MAX_ROWS);
 
         assertThat(output.getText(), is("Here is the breakdown."));
         assertThat(output.getQuery(), is("SELECT region, revenue FROM sales"));
@@ -82,7 +84,7 @@ class GenieConversationTest {
     void sqlOnlyAnswerLeavesTextUnset() throws Exception {
         var fake = sqlFake("SELECT 1");
 
-        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "Count rows", null);
+        var output = GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "Count rows", null, GenieConversation.DEFAULT_MAX_ROWS);
 
         assertThat(output.getText(), nullValue());
         assertThat(output.getQuery(), is("SELECT 1"));
@@ -104,7 +106,8 @@ class GenieConversationTest {
             "space-1",
             "conv-1",
             "Break that down by month",
-            null
+            null,
+            GenieConversation.DEFAULT_MAX_ROWS
         );
 
         assertThat(fake.lastConversationId, is("conv-1"));
@@ -116,27 +119,62 @@ class GenieConversationTest {
     }
 
     @Test
-    void failedMessageThrows() {
+    void failedMessageIncludesGenieError() {
         var fake = new FakeGenie();
         fake.started = new GenieStartConversationResponse().setConversationId("conv-1").setMessageId("msg-1");
-        fake.completed = new GenieMessage().setStatus(MessageStatus.FAILED);
+        fake.completed = new GenieMessage()
+            .setStatus(MessageStatus.FAILED)
+            .setError(new MessageError().setError("warehouse is stopped"));
 
-        assertThrows(
+        var failure = assertThrows(
             IllegalStateException.class,
-            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ofSeconds(5))
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ofSeconds(5), GenieConversation.DEFAULT_MAX_ROWS)
         );
+        assertThat(failure.getMessage(), containsString("FAILED"));
+        assertThat(failure.getMessage(), containsString("warehouse is stopped"));
     }
 
     @Test
-    void timeoutIsPassedToTheWait() {
+    void cancelledMessageIncludesGenieError() {
+        var fake = new FakeGenie();
+        fake.started = new GenieStartConversationResponse().setConversationId("conv-1").setMessageId("msg-1");
+        fake.completed = new GenieMessage()
+            .setStatus(MessageStatus.CANCELLED)
+            .setError(new MessageError().setError("cancelled by user"));
+
+        var failure = assertThrows(
+            IllegalStateException.class,
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ofSeconds(5), GenieConversation.DEFAULT_MAX_ROWS)
+        );
+        assertThat(failure.getMessage(), containsString("CANCELLED"));
+        assertThat(failure.getMessage(), containsString("cancelled by user"));
+    }
+
+    @Test
+    void zeroTimeoutIsRejected() {
+        var fake = new FakeGenie();
+        fake.started = new GenieStartConversationResponse().setConversationId("conv-1").setMessageId("msg-1");
+
+        var failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ZERO, GenieConversation.DEFAULT_MAX_ROWS)
+        );
+        assertThat(failure.getMessage(), containsString("timeout"));
+        assertThat(fake.lastQuestion, nullValue());
+    }
+
+    @Test
+    void timeoutNamesTheProperty() {
         var fake = new FakeGenie();
         fake.started = new GenieStartConversationResponse().setConversationId("conv-1").setMessageId("msg-1");
         fake.completed = new GenieMessage().setStatus(MessageStatus.SUBMITTED);
 
-        assertThrows(
+        var failure = assertThrows(
             TimeoutException.class,
-            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ZERO)
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", Duration.ofNanos(1), GenieConversation.DEFAULT_MAX_ROWS)
         );
+        assertThat(failure.getMessage(), containsString("timeout"));
+        assertThat(failure.getMessage(), containsString("simplify the question"));
     }
 
     @Test
@@ -151,11 +189,26 @@ class GenieConversationTest {
 
         assertThrows(
             IllegalStateException.class,
-            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", null)
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", null, GenieConversation.DEFAULT_MAX_ROWS)
         );
     }
 
-    private static FakeGenie sqlFake(String sql) {
+    @Test
+    void tooManyRowsNamesTheLimit() {
+        var fake = sqlFake("SELECT 1");
+        fake.queryResult.getStatementResponse().setResult(
+            new ResultData().setDataArray(List.of(List.of("emea", "10"), List.of("amer", "12")))
+        );
+
+        var failure = assertThrows(
+            IllegalStateException.class,
+            () -> GenieConversation.ask(new GenieAPI(fake.service()), "space-1", "question", null, 1)
+        );
+        assertThat(failure.getMessage(), containsString("maxRows"));
+        assertThat(failure.getMessage(), containsString("2"));
+    }
+
+    static FakeGenie sqlFake(String sql) {
         var fake = new FakeGenie();
         fake.started = new GenieStartConversationResponse().setConversationId("conv-1").setMessageId("msg-1");
         fake.completed = new GenieMessage()
@@ -193,6 +246,7 @@ class GenieConversationTest {
         GenieGetMessageQueryResultResponse queryResult;
         String lastQuestion;
         String lastConversationId;
+        String lastSpaceId;
         GenieGetMessageAttachmentQueryResultRequest lastQueryRequest;
         int queryResultCalls;
 
@@ -214,12 +268,14 @@ class GenieConversationTest {
                         case "startConversation" -> {
                             var request = (GenieStartConversationMessageRequest) args[0];
                             lastQuestion = request.getContent();
+                            lastSpaceId = request.getSpaceId();
                             yield started;
                         }
                         case "createMessage" -> {
                             var request = (GenieCreateConversationMessageRequest) args[0];
                             lastQuestion = request.getContent();
                             lastConversationId = request.getConversationId();
+                            lastSpaceId = request.getSpaceId();
                             yield created;
                         }
                         case "getMessage" -> completed;

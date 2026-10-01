@@ -2,7 +2,7 @@ group: io.kestra.plugin.databricks.genie
 name: "genie"
 title: "Databricks Genie"
 description: "Tasks that ask questions to a Databricks Genie space."
-body: "Ask a question of an existing Genie space, or send a follow-up with conversationId. The space must already exist. A text answer is returned on text; generated SQL is returned on query with its rows on result."
+body: "Ask a question of an existing Genie space, or send a follow-up with conversationId. The space must already exist. A text answer is returned on text; generated SQL is returned on query with its rows on result. At most maxRows rows are included (default 1000)."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

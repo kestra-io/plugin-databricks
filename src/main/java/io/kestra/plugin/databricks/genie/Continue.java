@@ -4,6 +4,9 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import com.databricks.sdk.service.dashboards.GenieAPI;
+
+import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -40,7 +43,7 @@ import lombok.experimental.SuperBuilder;
                     type: io.kestra.plugin.databricks.genie.AskQuestion
                     authentication:
                       token: "{{ secret('DATABRICKS_TOKEN') }}"
-                    host: <your-host>
+                    host: https://adb-1234567890123456.7.azuredatabricks.net
                     spaceId: <your-space>
                     question: What was total revenue by region last quarter?
 
@@ -48,7 +51,7 @@ import lombok.experimental.SuperBuilder;
                     type: io.kestra.plugin.databricks.genie.Continue
                     authentication:
                       token: "{{ secret('DATABRICKS_TOKEN') }}"
-                    host: <your-host>
+                    host: https://adb-1234567890123456.7.azuredatabricks.net
                     spaceId: <your-space>
                     conversationId: "{{ outputs.ask_question.conversationId }}"
                     question: Now break that down by month.
@@ -79,19 +82,42 @@ public class Continue extends AbstractTask implements RunnableTask<Continue.Outp
     @PluginProperty(group = "main")
     private Property<String> question;
 
-    @Schema(title = "Timeout", description = "How long to wait for Genie, as an ISO-8601 duration. Defaults to 20 minutes.")
+    @Builder.Default
+    @Schema(
+        title = "Timeout",
+        description = "How long to wait for Genie, as an ISO-8601 duration. Defaults to 20 minutes. Must be greater than zero."
+    )
     @PluginProperty(group = "main")
-    private Property<Duration> timeout;
+    private Property<Duration> timeout = Property.ofValue(GenieConversation.DEFAULT_TIMEOUT);
+
+    @Builder.Default
+    @Schema(
+        title = "Maximum rows",
+        description = "Maximum number of query rows included on result. Defaults to 1000. The task fails when Genie returns more rows than this; the error names maxRows and the row count."
+    )
+    @PluginProperty(group = "main")
+    private Property<Integer> maxRows = Property.ofValue(GenieConversation.DEFAULT_MAX_ROWS);
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        var reply = GenieConversation.followUp(
-            workspaceClient(runContext).genie(),
-            runContext.render(spaceId).as(String.class).orElseThrow(),
-            runContext.render(conversationId).as(String.class).orElseThrow(),
-            runContext.render(question).as(String.class).orElseThrow(),
-            timeout == null ? null : runContext.render(timeout).as(Duration.class).orElse(null)
-        );
+        return answer(runContext, genieApi(runContext));
+    }
+
+    protected GenieAPI genieApi(RunContext runContext) throws IllegalVariableEvaluationException {
+        return workspaceClient(runContext).genie();
+    }
+
+    Output answer(RunContext runContext, GenieAPI genie) throws Exception {
+        var space = runContext.render(spaceId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("The `spaceId` property is required, set it to the identifier of an existing Genie space"));
+        var conversation = runContext.render(conversationId).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("The `conversationId` property is required, set it to the conversationId from AskQuestion"));
+        var asked = runContext.render(question).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("The `question` property is required, set it to the question to ask Genie"));
+        var wait = runContext.render(timeout).as(Duration.class).orElse(null);
+        var limit = runContext.render(maxRows).as(Integer.class).orElse(GenieConversation.DEFAULT_MAX_ROWS);
+
+        var reply = GenieConversation.followUp(genie, space, conversation, asked, wait, limit);
         runContext.logger().info("Genie conversation {} message {} answered", reply.getConversationId(), reply.getMessageId());
 
         return Output.builder()
@@ -118,7 +144,10 @@ public class Continue extends AbstractTask implements RunnableTask<Continue.Outp
         @Schema(title = "Generated SQL", description = "SQL Genie produced. Unset for a text-only answer.")
         private String query;
 
-        @Schema(title = "Query result", description = "Rows for the generated SQL, keyed by column name. Unset for a text-only answer.")
+        @Schema(
+            title = "Query result",
+            description = "Rows for the generated SQL, keyed by column name. Unset for a text-only answer. Limited to maxRows; the task fails when Genie returns more."
+        )
         private List<Map<String, String>> result;
     }
 }
