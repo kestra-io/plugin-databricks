@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.unitycatalog.catalog
+name: "catalog"
+title: "Unity Catalog - Catalogs"
+description: "Tasks that create, read, update, list and delete Databricks Unity Catalog catalogs."
+body: "Use these tasks to provision and govern catalogs, the top level of the Unity Catalog namespace, from a flow. Create takes a name plus optional comment, storage root and properties; Get, Update and Delete address a catalog by name, and Delete accepts force to remove a non-empty catalog."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
