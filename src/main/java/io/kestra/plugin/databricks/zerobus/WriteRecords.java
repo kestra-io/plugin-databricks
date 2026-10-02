@@ -1,0 +1,453 @@
+package io.kestra.plugin.databricks.zerobus;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpHeaders;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import io.kestra.core.http.HttpRequest;
+import io.kestra.core.http.HttpResponse;
+import io.kestra.core.http.client.HttpClient;
+import io.kestra.core.http.client.HttpClientResponseException;
+import io.kestra.core.http.client.configurations.HttpConfiguration;
+import io.kestra.core.models.annotations.Example;
+import io.kestra.core.models.annotations.Metric;
+import io.kestra.core.models.annotations.Plugin;
+import io.kestra.core.models.annotations.PluginProperty;
+import io.kestra.core.models.executions.metrics.Counter;
+import io.kestra.core.models.property.Property;
+import io.kestra.core.models.tasks.RunnableTask;
+import io.kestra.core.runners.RunContext;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.plugin.databricks.AbstractTask;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+
+@SuperBuilder
+@ToString
+@EqualsAndHashCode
+@Getter
+@NoArgsConstructor
+@Plugin(
+    examples = {
+        @Example(
+            title = "Push inline records to a Databricks Delta table",
+            full = true,
+            code = """
+                id: write_inline_records_to_databricks
+                namespace: company.team
+
+                tasks:
+                  - id: write_records
+                    type: io.kestra.plugin.databricks.zerobus.WriteRecords
+                    host: "{{ secret('DATABRICKS_HOST') }}"
+                    authentication:
+                      token: "{{ secret('DATABRICKS_TOKEN') }}"
+                    workspaceId: "{{ secret('DATABRICKS_WORKSPACE_ID') }}"
+                    region: us-east-1
+                    catalog: main
+                    schema: events
+                    table: user_events
+                    records:
+                      - userId: usr_001
+                        event: page_view
+                      - userId: usr_002
+                        event: purchase
+                """
+        ),
+        @Example(
+            title = "Push records from an internal storage file (Ion or JSON-lines)",
+            full = true,
+            code = """
+                id: write_file_to_databricks
+                namespace: company.team
+
+                tasks:
+                  - id: write_records
+                    type: io.kestra.plugin.databricks.zerobus.WriteRecords
+                    host: "{{ secret('DATABRICKS_HOST') }}"
+                    authentication:
+                      clientId: "{{ secret('DATABRICKS_CLIENT_ID') }}"
+                      clientSecret: "{{ secret('DATABRICKS_CLIENT_SECRET') }}"
+                    workspaceId: "{{ secret('DATABRICKS_WORKSPACE_ID') }}"
+                    region: us-east-1
+                    catalog: main
+                    schema: events
+                    table: raw_events
+                    from: "{{ outputs.fetch_events.uri }}"
+                """
+        )
+    },
+    metrics = {
+        @Metric(name = "records.count", type = "counter", description = "Number of records pushed to Zerobus Ingest")
+    }
+)
+@Schema(
+    title = "Push data directly into a Unity Catalog Delta table via Zerobus Ingest",
+    description = """
+        This task sends data to a Databricks Delta table via the push-based Zerobus Ingest REST API.
+
+        It supports at-least-once delivery. If a task is retried after a partial failure, records that were already
+        successfully accepted in previous chunks will be sent again and may be duplicated in the target table.
+
+        The task authenticates using either OAuth client credentials or a Personal Access Token (PAT).
+        The OAuth token is minted exactly once per execution.
+        **Note:** PAT authentication is documented as unverified against Zerobus Ingest; use OAuth client credentials if possible.
+        The `host` property is required when using OAuth authentication.
+
+        Records are sent in chunks, bounded by conservative assumptions since the API docs do not specify a per-request limit.
+
+        **Note:** The inherited properties `configFile` and `accountId` are ignored by this task, and `AbstractTask` environment variable fallbacks are not honoured.
+        """
+)
+public class WriteRecords extends AbstractTask implements RunnableTask<WriteRecords.Output> {
+    private static final String UNSUPPORTED_AUTH_MSG = "Zerobus Ingest REST requires either a personal access token (authentication.token) or OAuth client credentials (authentication.clientId + authentication.clientSecret). Other authentication types are not supported.";
+
+    static final int MAX_RECORDS_PER_CHUNK = 500;
+    static final int MAX_BYTES_PER_CHUNK = 4 * 1024 * 1024; // 4 MB
+
+    @NotNull
+    @Schema(title = "Unity Catalog catalog name")
+    @PluginProperty(group = "main")
+    private Property<String> catalog;
+
+    @NotNull
+    @Schema(title = "Schema (database) name")
+    @PluginProperty(group = "main")
+    private Property<String> schema;
+
+    @NotNull
+    @Schema(title = "Target Delta table name")
+    @PluginProperty(group = "main")
+    private Property<String> table;
+
+    @Schema(title = "Numeric workspace ID", description = "Used to build the Zerobus endpoint and OAuth resource parameter.")
+    @PluginProperty(group = "connection")
+    private Property<String> workspaceId;
+
+    @Schema(title = "Cloud region", description = "Region (e.g. us-east-1). Ignored when 'endpoint' is set. Required when 'endpoint' is not set.")
+    @PluginProperty(group = "connection")
+    private Property<String> region;
+
+    @Schema(title = "Zerobus endpoint URL override", description = "Replaces the auto-computed URL (e.g. https://my-proxy).")
+    @PluginProperty(group = "connection")
+    private Property<String> endpoint;
+
+    @Schema(title = "Inline records", description = "List of JSON objects. Mutually exclusive with 'from'.")
+    @PluginProperty(group = "main")
+    private Property<List<Map<String, Object>>> records;
+
+    @Schema(title = "Internal storage URI", description = "URI of an Ion or JSON-lines file. Mutually exclusive with 'records'.")
+    @PluginProperty(internalStorageURI = true, group = "main")
+    private Property<String> from;
+
+    @Override
+    public Output run(RunContext runContext) throws Exception {
+        boolean hasRecords = this.records != null;
+        boolean hasFrom = this.from != null;
+
+        if (hasRecords == hasFrom) {
+            if (hasRecords) {
+                throw new IllegalArgumentException("Set either 'records' or 'from', not both.");
+            } else {
+                throw new IllegalArgumentException("Set 'records' for inline data or 'from' for a Kestra internal storage URI.");
+            }
+        }
+
+        String renderedEndpoint = runContext.render(this.endpoint).as(String.class).orElse(null);
+        String renderedRegion = runContext.render(this.region).as(String.class).orElse(null);
+        String renderedWorkspaceId = runContext.render(this.workspaceId).as(String.class).orElse(null);
+
+        if (renderedEndpoint == null && renderedRegion == null) {
+            throw new IllegalArgumentException("Either 'endpoint' or 'region' must be set to determine the Zerobus Ingest server.");
+        }
+
+        String renderedCatalog = runContext.render(this.catalog).as(String.class).orElseThrow(() -> new IllegalArgumentException("catalog must be provided"));
+        String renderedSchema = runContext.render(this.schema).as(String.class).orElseThrow(() -> new IllegalArgumentException("schema must be provided"));
+        String renderedTable = runContext.render(this.table).as(String.class).orElseThrow(() -> new IllegalArgumentException("table must be provided"));
+        String renderedHost = this.getHost() != null ? runContext.render(this.getHost()).as(String.class).orElse(null) : null;
+        validateAuthentication(runContext, renderedWorkspaceId, renderedHost);
+
+        if (renderedEndpoint == null && renderedWorkspaceId == null) {
+            throw new IllegalArgumentException("workspaceId is required when endpoint is not set.");
+        }
+
+        String ingestUrl = buildIngestUrl(renderedEndpoint, renderedWorkspaceId, renderedRegion, renderedCatalog, renderedSchema, renderedTable);
+
+        AtomicLong totalAcceptedCount = new AtomicLong(0);
+        try (
+            var httpClient = HttpClient.builder()
+                .runContext(runContext)
+                .configuration(HttpConfiguration.builder().build())
+                .build()
+        ) {
+
+            List<Map<String, Object>> chunk = new ArrayList<>();
+            int currentChunkBytes = 0;
+            String bearerToken = null;
+
+            @SuppressWarnings({ "unchecked", "rawtypes" })
+            List<Map<String, Object>> recordsList = hasRecords ? (List) runContext.render(this.records).asList(Map.class) : null;
+
+            BufferedReader reader = null;
+            if (!hasRecords) {
+                String fromUri = runContext.render(this.from).as(String.class).orElseThrow(() -> new IllegalArgumentException("from must be provided"));
+                reader = new BufferedReader(new InputStreamReader(runContext.storage().getFile(URI.create(fromUri)), StandardCharsets.UTF_8));
+            }
+
+            try {
+                int inlineIndex = 0;
+                int physicalLineCount = 0;
+                while (true) {
+                    Map<String, Object> record = null;
+                    if (hasRecords) {
+                        if (inlineIndex < recordsList.size()) {
+                            record = recordsList.get(inlineIndex++);
+                        }
+                    } else {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            physicalLineCount++;
+                            if (!line.isBlank()) {
+                                break;
+                            }
+                        }
+                        if (line != null) {
+                            try {
+                                record = JacksonMapper.ofIon().readValue(line, new TypeReference<>() {
+                                });
+                            } catch (Exception e) {
+                                throw new IllegalStateException("Failed to parse record at line " + physicalLineCount + ": " + e.getMessage(), e);
+                            }
+                            inlineIndex++;
+                        }
+                    }
+
+                    if (record == null) {
+                        break;
+                    }
+
+                    byte[] recordBytes = JacksonMapper.ofJson().writeValueAsBytes(record);
+
+                    if (!chunk.isEmpty() && (chunk.size() >= MAX_RECORDS_PER_CHUNK || currentChunkBytes + recordBytes.length > MAX_BYTES_PER_CHUNK)) {
+                        if (bearerToken == null) {
+                            bearerToken = resolveBearerToken(runContext, renderedWorkspaceId, renderedCatalog, renderedSchema, renderedTable);
+                        }
+                        sendChunk(httpClient, ingestUrl, bearerToken, chunk, renderedCatalog, renderedSchema, renderedTable, totalAcceptedCount);
+                        chunk.clear();
+                        currentChunkBytes = 0;
+                    }
+
+                    chunk.add(record);
+                    currentChunkBytes += recordBytes.length;
+                }
+
+                if (!chunk.isEmpty()) {
+                    if (bearerToken == null) {
+                        bearerToken = resolveBearerToken(runContext, renderedWorkspaceId, renderedCatalog, renderedSchema, renderedTable);
+                    }
+                    sendChunk(httpClient, ingestUrl, bearerToken, chunk, renderedCatalog, renderedSchema, renderedTable, totalAcceptedCount);
+                }
+            } finally {
+                if (reader != null) {
+                    reader.close();
+                }
+            }
+        } finally {
+            runContext.metric(Counter.of("records.count", totalAcceptedCount.get()));
+        }
+
+        return Output.builder().recordsCount(totalAcceptedCount.get()).build();
+    }
+
+    private void sendChunk(HttpClient httpClient, String url, String token, List<Map<String, Object>> chunk, String catalog, String schema, String table, AtomicLong alreadyAccepted)
+        throws Exception {
+        try {
+            HttpRequest request = HttpRequest.builder()
+                .uri(URI.create(url))
+                .method("POST")
+                .body(HttpRequest.JsonRequestBody.of(chunk))
+                .headers(
+                    HttpHeaders.of(
+                        Map.of(
+                            "Authorization", List.of("Bearer " + token)
+                        ), (a, b) -> true
+                    )
+                )
+                .build();
+
+            httpClient.request(request, String.class);
+            alreadyAccepted.addAndGet(chunk.size());
+        } catch (HttpClientResponseException e) {
+            int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
+            String body = readHttpErrorBody(e);
+
+            if (status >= 400 && status < 500) {
+                String advice = (status == 403 || status == 404) ? String.format(
+                    " Check that the table '%s.%s.%s' exists, the schema matches, and the service principal has USE CATALOG, USE SCHEMA, SELECT, and MODIFY privileges.", catalog, schema, table
+                ) : "";
+                throw new IllegalStateException(
+                    String.format(
+                        "Zerobus Ingest rejected the request (HTTP %d): %s.%s %d records in prior chunks were already accepted (at-least-once delivery).", status, truncate(body), advice,
+                        alreadyAccepted.get()
+                    )
+                );
+            } else {
+                throw new IllegalStateException(
+                    String.format(
+                        "Zerobus Ingest returned a server error (HTTP %d): %s. The request may be retried. %d records in prior chunks were already accepted (at-least-once delivery).", status,
+                        truncate(body), alreadyAccepted.get()
+                    )
+                );
+            }
+        }
+    }
+
+    private void validateAuthentication(RunContext runContext, String renderedWorkspaceId, String renderedHost) throws Exception {
+        if (this.getAuthentication() != null) {
+            String token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+            String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElse(null);
+            String clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class).orElse(null);
+
+            if (token != null) {
+                return;
+            } else if (clientId != null && clientSecret != null) {
+                if (renderedWorkspaceId == null) {
+                    throw new IllegalArgumentException("workspaceId is required when using OAuth authentication.");
+                }
+                if (renderedHost == null) {
+                    throw new IllegalArgumentException("host is required when using OAuth authentication.");
+                }
+                return;
+            }
+        }
+        throw new IllegalArgumentException(UNSUPPORTED_AUTH_MSG);
+    }
+
+    private String resolveBearerToken(RunContext runContext, String renderedWorkspaceId, String renderedCatalog, String renderedSchema, String renderedTable) throws Exception {
+        String token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+        if (token != null) {
+            return token;
+        }
+
+        String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow();
+        String clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class).orElseThrow();
+        String renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow();
+
+        return fetchOAuthToken(runContext, renderedHost, renderedWorkspaceId, clientId, clientSecret, renderedCatalog, renderedSchema, renderedTable);
+    }
+
+    static String fetchOAuthToken(RunContext runContext, String host, String workspaceId, String clientId, String clientSecret, String catalog, String schema, String table) throws Exception {
+        String cleanHost = host.endsWith("/") ? host.substring(0, host.length() - 1) : host;
+        String tokenUrl = cleanHost + "/oidc/v1/token";
+
+        List<Map<String, Object>> authDetails = List.of(
+            Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE CATALOG"), "object_type", "CATALOG", "object_full_path", catalog),
+            Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE SCHEMA"), "object_type", "SCHEMA", "object_full_path", catalog + "." + schema),
+            Map.of("type", "unity_catalog_privileges", "privileges", List.of("SELECT", "MODIFY"), "object_type", "TABLE", "object_full_path", catalog + "." + schema + "." + table)
+        );
+
+        String authDetailsJson = JacksonMapper.ofJson().writeValueAsString(authDetails);
+
+        Map<String, Object> formParams = Map.of(
+            "grant_type", "client_credentials",
+            "scope", "all-apis",
+            "resource", "api://databricks/workspaces/" + workspaceId + "/zerobusDirectWriteApi",
+            "authorization_details", authDetailsJson
+        );
+
+        String basicAuth = "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+
+        try (
+            var httpClient = HttpClient.builder()
+                .runContext(runContext)
+                .configuration(HttpConfiguration.builder().build())
+                .build()
+        ) {
+
+            HttpRequest request = HttpRequest.builder()
+                .uri(URI.create(tokenUrl))
+                .method("POST")
+                .body(HttpRequest.UrlEncodedRequestBody.of(formParams))
+                .headers(
+                    HttpHeaders.of(
+                        Map.of(
+                            "Authorization", List.of(basicAuth)
+                        ), (a, b) -> true
+                    )
+                )
+                .build();
+
+            HttpResponse<String> response = httpClient.request(request, String.class);
+
+            Map<String, Object> body = JacksonMapper.ofJson().readValue(response.getBody(), new TypeReference<>() {
+            });
+            if (body.containsKey("access_token")) {
+                Object tokenObj = body.get("access_token");
+                if (tokenObj instanceof String) {
+                    return (String) tokenObj;
+                } else {
+                    throw new IllegalStateException("Failed to obtain an OAuth token from " + tokenUrl + " (HTTP 200). access_token in response is not a string.");
+                }
+            } else {
+                throw new IllegalStateException("Failed to obtain an OAuth token from " + tokenUrl + " (HTTP 200). access_token missing in response.");
+            }
+        } catch (HttpClientResponseException e) {
+            int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
+            String body = readHttpErrorBody(e);
+            throw new IllegalStateException(String.format("Failed to obtain an OAuth token from %s (HTTP %d): %s. Check clientId and clientSecret.", tokenUrl, status, truncate(body)));
+        }
+    }
+
+    static String buildIngestUrl(String endpoint, String workspaceId, String region, String catalog, String schema, String table) {
+        String base = endpoint != null ? (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint)
+            : "https://" + workspaceId + ".zerobus." + region + ".cloud.databricks.com";
+        return base + "/zerobus/v1/tables/" + encode(catalog) + "." + encode(schema) + "." + encode(table) + "/insert";
+    }
+
+    static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private static String readHttpErrorBody(HttpClientResponseException e) {
+        if (e.getResponse() != null && e.getResponse().getBody() != null) {
+            Object rawBody = e.getResponse().getBody();
+            if (rawBody instanceof byte[]) {
+                return new String((byte[]) rawBody, StandardCharsets.UTF_8);
+            } else {
+                return rawBody.toString();
+            }
+        }
+        return "";
+    }
+
+    private static String truncate(String body) {
+        // Truncate body to avoid overly large exception messages.
+        if (body == null)
+            return "";
+        return body.length() > 500 ? body.substring(0, 500) + "..." : body;
+    }
+
+    @Builder
+    @Getter
+    public static class Output implements io.kestra.core.models.tasks.Output {
+        @Schema(title = "Records count", description = "Total number of records successfully sent to Zerobus Ingest")
+        private final long recordsCount;
+    }
+}
