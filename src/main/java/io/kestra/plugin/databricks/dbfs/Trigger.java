@@ -116,7 +116,7 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "DBFS path to watch",
-        description = "Absolute DBFS path to a directory or file, such as `/mnt/incoming`."
+        description = "Absolute DBFS directory path to watch, such as `/mnt/incoming`."
     )
     @NotNull
     @PluginProperty(group = "main")
