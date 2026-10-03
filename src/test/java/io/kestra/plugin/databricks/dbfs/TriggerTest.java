@@ -141,13 +141,13 @@ class TriggerTest {
         ));
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        trigger.regExp = Property.ofValue(".*/a\\\\.csv");
+        trigger.regExp = Property.ofValue(".*/a\\.csv");
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
 
-        trigger.regExp = Property.ofValue(".*/b\\\\.csv");
+        trigger.regExp = Property.ofValue(".*/b\\.csv");
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
 
-        trigger.regExp = Property.ofValue(".*/a\\\\.csv");
+        trigger.regExp = Property.ofValue(".*/a\\.csv");
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
     }
 
