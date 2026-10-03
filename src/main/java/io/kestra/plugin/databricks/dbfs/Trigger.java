@@ -5,10 +5,12 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 import com.databricks.sdk.WorkspaceClient;
@@ -183,9 +185,9 @@ public class Trigger extends AbstractTrigger
         Map<String, StatefulTriggerService.Entry> state =
             StatefulTriggerService.readState(runContext, rStateKey, rStateTtl);
 
-        var seen = listedFiles.stream()
+        Set<String> seen = listedFiles.stream()
             .map(FileInfo::getPath)
-            .collect(java.util.stream.Collectors.toSet());
+            .collect(Collectors.toSet());
 
         var files = listedFiles.stream()
             .filter(file -> regexp == null || regexp.matcher(file.getPath()).matches())
