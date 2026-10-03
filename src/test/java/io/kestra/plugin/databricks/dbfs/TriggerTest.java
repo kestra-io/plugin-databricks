@@ -124,6 +124,32 @@ class TriggerTest {
     }
 
     @Test
+    void emptyDirectoryDoesNotTrigger() throws Exception {
+        var trigger = new MockTrigger(List.of());
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
+    }
+
+    @Test
+    void regexFilteringDoesNotPruneStateForExistingFiles() throws Exception {
+        var trigger = new MockTrigger(List.of(
+            file("/mnt/incoming/a.csv", 10L, 100L),
+            file("/mnt/incoming/b.csv", 20L, 200L)
+        ));
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        trigger.regExp = Property.ofValue(".*/a\\\\.csv");
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
+
+        trigger.regExp = Property.ofValue(".*/b\\\\.csv");
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
+
+        trigger.regExp = Property.ofValue(".*/a\\\\.csv");
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
+    }
+
+    @Test
     void filtersDirectoriesAndSupportsRecursiveListingAndRegex() throws Exception {
         var trigger = new MockTrigger(Map.of(
             "/mnt/incoming", List.of(
