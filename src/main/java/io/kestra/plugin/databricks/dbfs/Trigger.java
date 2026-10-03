@@ -9,7 +9,6 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.databricks.sdk.WorkspaceClient;
@@ -265,7 +264,7 @@ public class Trigger extends AbstractTrigger
                 continue;
             }
 
-            for (var file : workspaceClient.dbfs().list(currentPath)) {
+            for (var file : listDirectory(workspaceClient, currentPath)) {
                 result.add(file);
 
                 if (recursive && Boolean.TRUE.equals(file.getIsDir()) && file.getPath() != null) {
@@ -306,6 +305,10 @@ public class Trigger extends AbstractTrigger
 
         ConfigLoader.resolve(cfg);
         return new WorkspaceClient(cfg);
+    }
+
+    protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
+        return workspaceClient.dbfs().list(path);
     }
 
     public enum ChangeType {
