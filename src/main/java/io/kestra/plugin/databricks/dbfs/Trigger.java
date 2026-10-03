@@ -56,7 +56,7 @@ import lombok.experimental.SuperBuilder;
         keep watched directories reasonably bounded. Set `recursive` to true to monitor files below
         partition directories.
         The trigger persists file state in Kestra's namespace KV store to avoid duplicate events.
-        The first poll reports existing matching files as CREATE events when `on` is CREATE (the default).
+        The first poll reports existing matching files as CREATE events; the default `on` mode is CREATE_OR_UPDATE.
         """
 )
 @Plugin(
@@ -142,7 +142,7 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "Trigger condition",
-        description = "Which file changes fire the trigger. CREATE is the default."
+        description = "Which file changes fire the trigger. Defaults to CREATE_OR_UPDATE."
     )
     @Builder.Default
     protected Property<On> on = Property.ofValue(On.CREATE_OR_UPDATE);
@@ -168,7 +168,7 @@ public class Trigger extends AbstractTrigger
         }
 
         var recursiveFiles = runContext.render(recursive).as(Boolean.class).orElse(false);
-        var rOn = runContext.render(on).as(On.class).orElse(On.CREATE);
+        var rOn = runContext.render(on).as(On.class).orElse(On.CREATE_OR_UPDATE);
         var rStateKey = runContext.render(stateKey).as(String.class)
             .orElseGet(() -> StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id));
         var rStateTtl = runContext.render(stateTtl).as(Duration.class);
