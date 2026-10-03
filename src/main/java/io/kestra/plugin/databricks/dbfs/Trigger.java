@@ -5,8 +5,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.ArrayDeque;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.databricks.sdk.WorkspaceClient;
@@ -143,7 +146,7 @@ public class Trigger extends AbstractTrigger
         description = "Which file changes fire the trigger. CREATE is the default."
     )
     @Builder.Default
-    protected Property<On> on = Property.ofValue(On.CREATE);
+    protected Property<On> on = Property.ofValue(On.CREATE_OR_UPDATE);
 
     @Schema(
         title = "State key",
@@ -246,15 +249,35 @@ public class Trigger extends AbstractTrigger
     }
 
     /**
-     * Lists DBFS entries using the Databricks SDK. The SDK handles pagination for both methods.
+     * Lists DBFS entries using the Databricks SDK. The SDK handles pagination for each directory listing.
+     * Recursive traversal is implemented here because the DBFS SDK exposes pagination for list(), not
+     * a recursive-list operation.
      */
     protected List<FileInfo> listFiles(WorkspaceClient workspaceClient, String path, boolean recursive) {
-        Iterable<FileInfo> entries = recursive
-            ? workspaceClient.dbfs().recursiveList(path)
-            : workspaceClient.dbfs().list(path);
-
         var result = new ArrayList<FileInfo>();
-        entries.forEach(result::add);
+        var directories = new ArrayDeque<String>();
+        var visitedDirectories = new HashSet<String>();
+        directories.add(path);
+
+        while (!directories.isEmpty()) {
+            var currentPath = directories.removeFirst();
+            if (!visitedDirectories.add(currentPath)) {
+                continue;
+            }
+
+            for (var file : workspaceClient.dbfs().list(currentPath)) {
+                result.add(file);
+
+                if (recursive && Boolean.TRUE.equals(file.getIsDir()) && file.getPath() != null) {
+                    directories.addLast(file.getPath());
+                }
+            }
+
+            if (!recursive) {
+                break;
+            }
+        }
+
         return result;
     }
 
