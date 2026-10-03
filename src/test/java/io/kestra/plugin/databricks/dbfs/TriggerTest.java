@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -122,10 +123,14 @@ class TriggerTest {
 
     @Test
     void filtersDirectoriesAndSupportsRecursiveListingAndRegex() throws Exception {
-        var trigger = new MockTrigger(List.of(
-            new FileInfo().setPath("/mnt/incoming/partition=2026-10-03").setIsDir(true),
-            file("/mnt/incoming/a.csv", 10L, 100L),
-            file("/mnt/incoming/partition=2026-10-03/b.csv", 20L, 200L)
+        var trigger = new MockTrigger(Map.of(
+            "/mnt/incoming", List.of(
+                new FileInfo().setPath("/mnt/incoming/partition=2026-10-03").setIsDir(true),
+                file("/mnt/incoming/a.csv", 10L, 100L)
+            ),
+            "/mnt/incoming/partition=2026-10-03", List.of(
+                file("/mnt/incoming/partition=2026-10-03/b.csv", 20L, 200L)
+            )
         ));
         trigger.recursive = Property.ofValue(true);
         trigger.regExp = Property.ofValue(".*/b\\.csv");
@@ -135,7 +140,7 @@ class TriggerTest {
 
         assertThat(execution.isPresent(), is(true));
         assertThat(triggeredPaths(execution.get()), contains("/mnt/incoming/partition=2026-10-03/b.csv"));
-        assertThat(trigger.recursiveRequested, is(true));
+        assertThat(trigger.listedPaths, contains("/mnt/incoming", "/mnt/incoming/partition=2026-10-03"));
     }
 
     private static FileInfo file(String path, long size, long modifiedAt) {
@@ -156,7 +161,8 @@ class TriggerTest {
     private static class MockTrigger extends Trigger {
         private List<FileInfo> current;
         private List<FileInfo> next;
-        private boolean recursiveRequested;
+        private Map<String, List<FileInfo>> directories;
+        private List<String> listedPaths = new java.util.ArrayList<>();
 
         MockTrigger(List<FileInfo> current) {
             this.current = current;
@@ -174,14 +180,30 @@ class TriggerTest {
             this.next = next;
         }
 
+        MockTrigger(Map<String, List<FileInfo>> directories) {
+            this(directories.getOrDefault("/mnt/incoming", List.of()));
+            this.directories = new HashMap<>(directories);
+        }
+
         @Override
         protected WorkspaceClient workspaceClient(RunContext runContext) {
             return null;
         }
 
         @Override
+        protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
+            listedPaths.add(path);
+            if (directories != null) {
+                return directories.getOrDefault(path, List.of());
+            }
+            return current;
+        }
+
+        @Override
         protected List<FileInfo> listFiles(WorkspaceClient workspaceClient, String path, boolean recursive) {
-            recursiveRequested = recursive;
+            if (directories != null) {
+                return super.listFiles(workspaceClient, path, recursive);
+            }
             if (next != null) {
                 var result = current;
                 current = next;
