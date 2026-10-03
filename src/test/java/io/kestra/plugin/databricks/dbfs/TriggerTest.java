@@ -98,6 +98,8 @@ class TriggerTest {
             file("/mnt/incoming/a.csv", 15L, 200L)
         );
 
+        trigger.on = Property.ofValue(StatefulTriggerInterface.On.CREATE);
+
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
