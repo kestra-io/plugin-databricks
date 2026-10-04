@@ -1,6 +1,6 @@
 # How to use the Databricks plugin
 
-Run jobs, manage clusters, execute SQL, and move files on Databricks from Kestra flows.
+Run jobs, manage clusters, execute SQL, ask Genie, and move files on Databricks from Kestra flows.
 
 ## Authentication
 
@@ -19,3 +19,5 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 `dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path.
 
 `cli.DatabricksCLI` runs Databricks CLI commands in a container — set `commands` (the `host` and authentication are passed to the CLI via environment variables). `cli.DatabricksSQLCLI` runs SQL statements through the Databricks SQL CLI — set `commands` along with the connection properties, and use `outputFiles` to persist the CLI output.
+
+`genie.AskQuestion` asks a question of an existing Genie space — set `spaceId` and `question`. It blocks until Genie answers; `timeout` is an ISO-8601 duration (default 20 minutes) and must be greater than zero. `genie.Continue` sends a follow-up — set `conversationId` from the previous task. The space has to exist first. A text answer is returned on `text`. Generated SQL is returned on `query` with rows on `result`; a text-only answer leaves those unset. At most `maxRows` rows are returned (default 1000); a larger result fails and names `maxRows` and the row count.
