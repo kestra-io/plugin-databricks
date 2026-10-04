@@ -148,18 +148,21 @@ public class Trigger extends AbstractTrigger
         description = "Which file changes fire the trigger. Defaults to CREATE_OR_UPDATE."
     )
     @Builder.Default
+    @PluginProperty(group = "advanced")
     protected Property<On> on = Property.ofValue(On.CREATE_OR_UPDATE);
 
     @Schema(
         title = "State key",
         description = "Key used to persist the trigger state. Defaults to a stable per-trigger key."
     )
+    @PluginProperty(group = "advanced")
     protected Property<String> stateKey;
 
     @Schema(
         title = "State TTL",
         description = "How long the persisted trigger state is retained. Unset means no expiry."
     )
+    @PluginProperty(group = "advanced")
     private Property<Duration> stateTtl;
 
     @Override
