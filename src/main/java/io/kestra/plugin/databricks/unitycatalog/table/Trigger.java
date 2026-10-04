@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.databricks.sdk.service.catalog.ListTablesRequest;
+
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -71,7 +73,8 @@ import lombok.experimental.SuperBuilder;
     description = """
         Periodically lists the tables of a schema and starts one execution for all the tables detected since the previous poll.
         The set of known tables is persisted in the namespace KV Store, so the first evaluation reports every existing table as new when `on` is `CREATE` (the default).
-        Use `on: UPDATE` or `on: CREATE_OR_UPDATE` to also react to tables modified since the previous poll."""
+        Use `on: UPDATE` or `on: CREATE_OR_UPDATE` to also react to tables modified since the previous poll.
+        The detected tables are returned without their column definitions, use the `table.Get` task to read the full schema of a table."""
 )
 public class Trigger extends AbstractTrigger implements PollingTriggerInterface, TriggerOutput<Trigger.Output>, StatefulTriggerInterface, DatabricksConnectionInterface {
     @Schema(title = "Databricks host")
@@ -113,13 +116,17 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     private Property<String> schemaName;
 
     @Builder.Default
+    @PluginProperty(group = "main")
     private final Duration interval = Duration.ofMinutes(5);
 
     @Builder.Default
+    @PluginProperty(group = "main")
     private Property<On> on = Property.ofValue(On.CREATE);
 
+    @PluginProperty(group = "advanced")
     private Property<String> stateKey;
 
+    @PluginProperty(group = "advanced")
     private Property<Duration> stateTtl;
 
     @Override
@@ -139,7 +146,13 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
         var detected = new ArrayList<Map<String, Object>>();
         var detectedNames = new ArrayList<String>();
 
-        for (var table : workspaceClient(runContext).tables().list(rCatalogName, rSchemaName)) {
+        // the state only needs the table name and its last update date, so skip the (potentially huge) column definitions
+        var request = new ListTablesRequest()
+            .setCatalogName(rCatalogName)
+            .setSchemaName(rSchemaName)
+            .setOmitColumns(true);
+
+        for (var table : workspaceClient(runContext).tables().list(request)) {
             var version = String.valueOf(table.getUpdatedAt());
             var modifiedAt = table.getUpdatedAt() == null ? null : Instant.ofEpochMilli(table.getUpdatedAt());
             var candidate = StatefulTriggerService.Entry.candidate(table.getFullName(), version, modifiedAt);
@@ -173,7 +186,7 @@ public class Trigger extends AbstractTrigger implements PollingTriggerInterface,
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "Tables detected since the previous poll, as returned by Databricks")
+        @Schema(title = "Tables detected since the previous poll, as returned by Databricks, without their column definitions")
         private final List<Map<String, Object>> tables;
 
         @Schema(title = "Fully qualified names (`catalog.schema.table`) of the detected tables")

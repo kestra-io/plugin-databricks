@@ -5,8 +5,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.databricks.sdk.WorkspaceClient;
+import com.databricks.sdk.service.catalog.ListTablesRequest;
 import com.databricks.sdk.service.catalog.TableInfo;
 import com.databricks.sdk.service.catalog.TablesAPI;
 
@@ -23,10 +25,10 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @KestraTest
@@ -54,7 +56,7 @@ class TriggerTest {
         var api = mock(TablesAPI.class);
         var first = polls[0];
         var rest = Arrays.copyOfRange(polls, 1, polls.length);
-        when(api.list(eq("main"), eq("landing_zone"))).thenReturn(first, rest);
+        when(api.list(any(ListTablesRequest.class))).thenReturn(first, rest);
 
         var client = mock(WorkspaceClient.class);
         when(client.tables()).thenReturn(api);
@@ -109,5 +111,26 @@ class TriggerTest {
         assertThat(second.isPresent(), is(true));
         assertThat(second.get().getTrigger(), notNullValue());
         assertThat(second.get().getTrigger().getVariables().get("fullNames"), is(List.of("main.landing_zone.events")));
+    }
+
+    @Test
+    void listsTablesWithoutColumns() throws Exception {
+        var api = mock(TablesAPI.class);
+        when(api.list(any(ListTablesRequest.class))).thenReturn(List.of(table("events", 1L)));
+        var client = mock(WorkspaceClient.class);
+        when(client.tables()).thenReturn(api);
+
+        var trigger = trigger(StatefulTriggerInterface.On.CREATE).build();
+        var spied = spy(trigger);
+        doReturn(client).when(spied).workspaceClient(any());
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        spied.evaluate(context.getKey(), context.getValue());
+
+        var request = ArgumentCaptor.forClass(ListTablesRequest.class);
+        verify(api).list(request.capture());
+        assertThat(request.getValue().getCatalogName(), is("main"));
+        assertThat(request.getValue().getSchemaName(), is("landing_zone"));
+        assertThat(request.getValue().getOmitColumns(), is(true));
     }
 }
