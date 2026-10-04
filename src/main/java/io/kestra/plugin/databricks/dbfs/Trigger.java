@@ -33,6 +33,7 @@ import io.kestra.core.models.triggers.StatefulTriggerService;
 import io.kestra.core.models.triggers.TriggerContext;
 import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.models.triggers.TriggerService;
+import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
 
 import io.swagger.v3.oas.annotations.media.Schema;
