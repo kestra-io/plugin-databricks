@@ -172,22 +172,10 @@ public class Trigger extends AbstractTrigger
 
         var recursiveFiles = runContext.render(recursive).as(Boolean.class).orElse(false);
         var rOn = runContext.render(on).as(On.class).orElse(On.CREATE_OR_UPDATE);
-        var rStateKey = stateKey == null
-            ? StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id)
-            : runContext.render(stateKey).as(String.class)
-                .orElseGet(() -> StatefulTriggerService.defaultKey(
-                    context.getNamespace(),
-                    context.getFlowId(),
-                    id
-                ));
-        var rStateTtl = stateTtl == null
-            ? Optional.<Duration>empty()
-            : runContext.render(stateTtl).as(Duration.class);
-        var regexp = regExp == null
-            ? null
-            : runContext.render(regExp).as(String.class)
-                .map(Pattern::compile)
-                .orElse(null);
+        var rStateKey = runContext.render(stateKey).as(String.class)
+            .orElseGet(() -> StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id));
+        var rStateTtl = runContext.render(stateTtl).as(Duration.class);
+        var regexp = runContext.render(regExp).as(String.class).map(Pattern::compile).orElse(null);
 
         var listedFiles = listFiles(workspaceClient(runContext), path, recursiveFiles).stream()
             .filter(file -> !Boolean.TRUE.equals(file.getIsDir()))
