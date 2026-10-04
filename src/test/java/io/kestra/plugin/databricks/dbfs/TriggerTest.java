@@ -35,7 +35,6 @@ class TriggerTest {
     void usesDefaultStateKeyWhenUnset() throws Exception {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         trigger.stateKey = null;
-        trigger.stateTtl = null;
         trigger.regExp = null;
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
