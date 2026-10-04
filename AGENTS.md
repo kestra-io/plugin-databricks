@@ -30,6 +30,9 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 - `io.kestra.plugin.databricks.job.CreateJob`
 - `io.kestra.plugin.databricks.job.SubmitRun`
 - `io.kestra.plugin.databricks.sql.Query`
+- `io.kestra.plugin.databricks.lakebase.Query`
+- `io.kestra.plugin.databricks.lakebase.Batch`
+- `io.kestra.plugin.databricks.lakebase.Trigger`
 
 ### Project Structure
 

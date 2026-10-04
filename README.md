@@ -77,6 +77,23 @@ tasks:
       - databricks clusters list
 ```
 
+## Lakebase — managed Postgres (OLTP)
+
+Lakebase authenticates with a short-lived OAuth token minted from a Databricks service principal. `Query`, `Batch`, and `Trigger` live under `io.kestra.plugin.databricks.lakebase` and mint a fresh credential on every connection.
+
+```yaml
+tasks:
+  - id: query_orders
+    type: io.kestra.plugin.databricks.lakebase.Query
+    workspaceHost: "{{ secret('DATABRICKS_HOST') }}"
+    clientId: "{{ secret('DATABRICKS_CLIENT_ID') }}"
+    clientSecret: "{{ secret('DATABRICKS_CLIENT_SECRET') }}"
+    endpoint: "{{ secret('LAKEBASE_ENDPOINT_NAME') }}"
+    database: orders_db
+    sql: SELECT id, status FROM orders WHERE status = 'pending'
+    fetchType: FETCH
+```
+
 ## Documentation
 * Full documentation can be found under [kestra.io/docs](https://kestra.io/docs)
 * Documentation for developing a plugin is included in the [Plugin Developer Guide](https://kestra.io/docs/plugin-developer-guide/).

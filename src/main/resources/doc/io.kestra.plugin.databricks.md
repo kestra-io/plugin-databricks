@@ -17,3 +17,13 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 `sql.Query` runs a SQL query against a Databricks SQL warehouse — set `host`, `httpPath`, `accessToken`, and `sql`. Optionally scope to a `catalog` and `schema`. Results are streamed to internal storage.
 
 `dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path.
+
+## Lakebase
+
+Lakebase is Databricks' managed Postgres (OLTP). It uses the standard Postgres wire protocol but authenticates with a short-lived OAuth token rather than a static password. Tokens expire after about 60 minutes, so `plugin-jdbc-postgres` with a pasted token will silently fail after expiry.
+
+`lakebase.Query`, `lakebase.Batch`, and `lakebase.Trigger` mint a fresh credential on every connection via the Databricks SDK (`WorkspaceClient.postgres().generateDatabaseCredential`) using OAuth M2M. Set `workspaceHost`, `clientId`, `clientSecret`, `endpoint` (format `projects/<project-id>/branches/<branch-id>/endpoints/<endpoint-id>`), and `database`. The service principal client ID is the Postgres username; the minted token is the password. SSL is enabled by default (`sslMode: REQUIRE`).
+
+Optionally set `host` to the Lakebase Postgres hostname. When `host` is omitted, it is resolved from the endpoint (`status.hosts.host`). The service principal needs Workspace access and a matching Postgres OAuth role.
+
+Do not reuse `plugin-jdbc-postgres` against Lakebase with a static token in `password` — mint a credential per execution instead.

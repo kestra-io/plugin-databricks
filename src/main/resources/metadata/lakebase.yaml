@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.lakebase
+name: "lakebase"
+title: "Databricks Lakebase"
+description: "Tasks that run transactional SQL against Databricks Lakebase, a managed Postgres OLTP database."
+body: "Connect to Lakebase with OAuth M2M (workspace host, service principal client ID and secret, and the Lakebase endpoint resource name). Each run mints a short-lived database credential via the Databricks SDK and uses it as the Postgres password, so tokens are never reused past their ~60-minute lifetime. Query fetches rows, Batch runs parameterized inserts or updates, and Trigger polls for new or changed rows."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

@@ -54,6 +54,9 @@ dependencies {
     // Databricks deps
     api "com.databricks:databricks-sdk-java:0.150.0"
     api "com.databricks:databricks-jdbc:3.4.2"
+
+    // Lakebase speaks the standard Postgres wire protocol
+    api "org.postgresql:postgresql:42.7.11"
 }
 
 
@@ -91,6 +94,7 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest"
     testImplementation "org.hamcrest:hamcrest-library"
     testImplementation group: "io.kestra", name: "script", version: kestraVersion
+    testImplementation "com.h2database:h2"
 }
 
 /**********************************************************************************************************************\
