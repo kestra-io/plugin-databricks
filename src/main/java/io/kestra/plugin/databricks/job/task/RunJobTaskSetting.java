@@ -16,13 +16,17 @@ import lombok.Getter;
 
 @Builder
 @Getter
+@Schema(title = "Run-job task settings")
 public class RunJobTaskSetting {
-    @Schema(title = "Job identifier", description = "Numeric identifier of the existing Databricks job to run")
-    @NotNull
-    @PluginProperty(group = "main")
+    @Schema(title = "Job ID", description = "ID of an existing Databricks job to run. Required.")
     private Property<String> jobId;
 
     @PluginProperty(dynamic = true, group = "advanced")
+    @Schema(
+        title = "Job parameters",
+        description = "Map of parameters passed to the triggered job. Can be a map of string/string or a variable that binds to a JSON object.",
+        anyOf = { String.class, Map.class }
+    )
     private Object jobParameters;
 
     public RunJobTask toRunJobTask(RunContext runContext) throws IllegalVariableEvaluationException {

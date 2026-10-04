@@ -124,9 +124,11 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
     private DockerOptions docker;
 
     @PluginProperty(group = "source")
+    @Schema(title = "Input files", description = "Files to make available to the CLI in the working directory, as a map of file name to content or a list of paths/URIs.")
     private Object inputFiles;
 
     @PluginProperty(group = "destination")
+    @Schema(title = "Output files", description = "List of files produced by the CLI to persist to Kestra internal storage.")
     private Property<List<String>> outputFiles;
 
     @Override

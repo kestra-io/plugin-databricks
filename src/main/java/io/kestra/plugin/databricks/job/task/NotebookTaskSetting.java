@@ -17,8 +17,10 @@ import lombok.Getter;
 @Builder
 @Getter
 public class NotebookTaskSetting {
+    @Schema(title = "Notebook path", description = "Absolute path of the notebook to run in the Databricks workspace or Git repository.")
     private Property<String> notebookPath;
 
+    @Schema(title = "Notebook source", description = "Where the notebook lives: `WORKSPACE` (default) or `GIT`.")
     private Property<Source> source;
 
     @PluginProperty(dynamic = true, additionalProperties = String.class, group = "advanced")
