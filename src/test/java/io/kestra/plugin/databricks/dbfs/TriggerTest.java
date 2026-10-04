@@ -32,6 +32,19 @@ class TriggerTest {
     private RunContextFactory runContextFactory;
 
     @Test
+    void usesDefaultStateKeyWhenUnset() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.stateKey = null;
+        trigger.stateTtl = null;
+        trigger.regExp = null;
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
+        assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
+    }
+
+    @Test
     void detectsNewFilesAndDoesNotRepeatThem() throws Exception {
         var trigger = new MockTrigger(List.of(
             file("/mnt/incoming/a.csv", 10L, 100L),
