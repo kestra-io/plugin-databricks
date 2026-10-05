@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.databricks.sdk.WorkspaceClient;
+import com.databricks.sdk.service.files.Delete;
 import com.databricks.sdk.service.files.FileInfo;
+import com.databricks.sdk.service.files.Move;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
 import io.kestra.core.models.annotations.Example;
@@ -177,7 +179,7 @@ public class Trigger extends AbstractTrigger
     )
     @Builder.Default
     @PluginProperty(group = "execution")
-    private Property<Integer> maxFiles = Property.ofValue(25);
+    protected Property<Integer> maxFiles = Property.ofValue(25);
 
 
     @Schema(
@@ -186,7 +188,7 @@ public class Trigger extends AbstractTrigger
     )
     @Builder.Default
     @PluginProperty(group = "advanced")
-    private Property<ActionInterface.Action> action = Property.ofValue(ActionInterface.Action.NONE);
+    protected Property<ActionInterface.Action> action = Property.ofValue(ActionInterface.Action.NONE);
 
 
     @Schema(
@@ -194,7 +196,7 @@ public class Trigger extends AbstractTrigger
         description = "Target DBFS directory when action is MOVE."
     )
     @PluginProperty(group = "advanced")
-    private Property<String> moveDirectory;
+    protected Property<String> moveDirectory;
 
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
@@ -355,12 +357,15 @@ public class Trigger extends AbstractTrigger
             var filePath = triggeredFile.getFile().getPath();
             switch (rAction) {
                 case MOVE -> workspaceClient.dbfs().move(
-                    filePath,
-                    rMoveDirectory.endsWith("/")
-                        ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
-                        : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
+                    new Move()
+                        .setSourcePath(filePath)
+                        .setDestinationPath(
+                            rMoveDirectory.endsWith("/")
+                                ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
+                                : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
+                        )
                 );
-                case DELETE -> workspaceClient.dbfs().delete(filePath);
+                case DELETE -> workspaceClient.dbfs().delete(new Delete().setPath(filePath));
                 case NONE -> { }
             }
         }
