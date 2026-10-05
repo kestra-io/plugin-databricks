@@ -270,8 +270,8 @@ public class Trigger extends AbstractTrigger
             .orElseGet(() -> StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id));
         var rStateTtl = runContext.render(stateTtl).as(Duration.class);
         var rMaxFiles = runContext.render(maxFiles).as(Integer.class).orElse(25);
-        if (rMaxFiles < 1) {
-            throw new IllegalArgumentException("maxFiles must be greater than 0");
+        if (rMaxFiles < 1 || rMaxFiles > 1000) {
+            throw new IllegalArgumentException("maxFiles must be between 1 and 1000");
         }
         var rAction = runContext.render(action).as(ActionInterface.Action.class).orElse(ActionInterface.Action.NONE);
         var rMoveDirectory = runContext.render(moveDirectory).as(String.class).orElse(null);
