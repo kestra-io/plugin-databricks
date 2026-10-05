@@ -17,6 +17,7 @@ import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.service.files.Delete;
 import com.databricks.sdk.service.files.FileInfo;
 import com.databricks.sdk.service.files.Move;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
 import io.kestra.core.models.annotations.Example;
@@ -33,10 +34,12 @@ import io.kestra.core.models.triggers.TriggerContext;
 import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.models.triggers.TriggerService;
 import io.kestra.core.runners.RunContext;
+import io.kestra.core.utils.PebbleUtil;
 import io.kestra.plugin.databricks.AbstractTask;
 import io.kestra.plugin.databricks.DatabricksConnectionInterface;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -197,6 +200,30 @@ public class Trigger extends AbstractTrigger
     @PluginProperty(group = "advanced")
     protected Property<String> moveDirectory;
 
+    @AssertTrue(message = "moveDirectory is required when action is MOVE")
+    @JsonIgnore
+    public boolean isMoveDirectorySetForMove() {
+        if (action == null) {
+            return true;
+        }
+
+        var expr = action.toString();
+
+        if (PebbleUtil.containsOpeningBlockDelimiter(expr)) {
+            return true;
+        }
+
+        if (!ActionInterface.Action.MOVE.name().equalsIgnoreCase(expr)) {
+            return true;
+        }
+
+        return moveDirectory != null
+            && (
+                PebbleUtil.containsOpeningBlockDelimiter(moveDirectory.toString())
+                    || !moveDirectory.toString().isBlank()
+            );
+    }
+
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
@@ -288,7 +315,7 @@ public class Trigger extends AbstractTrigger
             return Optional.empty();
         }
 
-        performAction(workspaceClient, detected, rAction, rMoveDirectory);
+        performAction(workspaceClient, detected, rAction, rMoveDirectory, runContext);
 
         runContext.logger().info(
             "Detected {} DBFS file(s) under '{}'",
@@ -346,7 +373,8 @@ public class Trigger extends AbstractTrigger
         WorkspaceClient workspaceClient,
         List<TriggeredFile> files,
         ActionInterface.Action rAction,
-        String rMoveDirectory
+        String rMoveDirectory,
+        RunContext runContext
     ) {
         if (rAction == ActionInterface.Action.NONE) {
             return;
@@ -354,19 +382,41 @@ public class Trigger extends AbstractTrigger
 
         for (var triggeredFile : files) {
             var filePath = triggeredFile.getFile().getPath();
-            switch (rAction) {
-                case MOVE -> workspaceClient.dbfs().move(
-                    new Move()
-                        .setSourcePath(filePath)
-                        .setDestinationPath(
-                            rMoveDirectory.endsWith("/")
-                                ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
-                                : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
-                        )
+
+            try {
+                performSingleAction(workspaceClient, triggeredFile, rAction, rMoveDirectory);
+            } catch (Exception e) {
+                runContext.logger().warn(
+                    "Failed to {} DBFS file '{}': {}",
+                    rAction,
+                    filePath,
+                    e.getMessage(),
+                    e
                 );
-                case DELETE -> workspaceClient.dbfs().delete(new Delete().setPath(filePath));
-                case NONE -> { }
             }
+        }
+    }
+
+    protected void performSingleAction(
+        WorkspaceClient workspaceClient,
+        TriggeredFile triggeredFile,
+        ActionInterface.Action rAction,
+        String rMoveDirectory
+    ) {
+        var filePath = triggeredFile.getFile().getPath();
+
+        switch (rAction) {
+            case MOVE -> workspaceClient.dbfs().move(
+                new Move()
+                    .setSourcePath(filePath)
+                    .setDestinationPath(
+                        rMoveDirectory.endsWith("/")
+                            ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
+                            : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
+                    )
+            );
+            case DELETE -> workspaceClient.dbfs().delete(new Delete().setPath(filePath));
+            case NONE -> { }
         }
     }
 

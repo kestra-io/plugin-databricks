@@ -2,6 +2,7 @@ package io.kestra.plugin.databricks.dbfs;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -9,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,11 +27,17 @@ import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 
 import jakarta.inject.Inject;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
 
 @KestraTest
 class TriggerTest {
     @Inject
     private RunContextFactory runContextFactory;
+
+    @Inject
+    private Validator validator;
 
     @Test
     void usesDefaultStateKeyWhenUnset() throws Exception {
@@ -170,13 +178,175 @@ class TriggerTest {
     }
 
     @Test
+    void failedActionDoesNotAbortBatch() throws Exception {
+        var trigger = new MockTrigger(List.of(
+            file("/mnt/incoming/a.csv", 10L, 100L),
+            file("/mnt/incoming/b.csv", 20L, 200L)
+        ));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+        trigger.moveDirectory = Property.ofValue("/mnt/archive");
+        trigger.failingActionPath = "/mnt/incoming/a.csv";
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+        assertThat(triggeredPaths(execution.get()), contains(
+            "/mnt/incoming/a.csv",
+            "/mnt/incoming/b.csv"
+        ));
+        assertThat(trigger.actedPaths, contains(
+            "/mnt/incoming/a.csv",
+            "/mnt/incoming/b.csv"
+        ));
+    }
+
+    @Test
     void moveActionRequiresMoveDirectory() throws Exception {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
+        assertThrows(
+            ConstraintViolationException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+    }
+
+    @Test
+    void moveWithoutDirectoryFailsValidation() {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+
+        Set<ConstraintViolation<Trigger>> violations = validator.validate(trigger);
+
+        assertThat(
+            violations.stream()
+                .filter(v -> v.getMessage().contains("moveDirectory is required when action is MOVE"))
+                .toList(),
+            hasSize(1)
+        );
+    }
+
+    @Test
+    void templatedActionPassesMoveDirectoryValidation() {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofExpression("{{ inputs.action }}");
+
+        Set<ConstraintViolation<Trigger>> violations = validator.validate(trigger);
+
+        assertThat(
+            violations.stream()
+                .filter(v -> v.getMessage().contains("moveDirectory is required when action is MOVE"))
+                .toList(),
+            hasSize(0)
+        );
+    }
+
+    @Test
+    void maxFilesRejectsZeroAndNegativeValues() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        trigger.maxFiles = Property.ofValue(0);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+
+        trigger.maxFiles = Property.ofValue(-1);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+    }
+
+    @Test
+    void relativeMoveDirectoryIsRejected() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+        trigger.moveDirectory = Property.ofValue("archive");
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+    }
+
+    @Test
+    void blankMoveDirectoryIsRejected() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+        trigger.moveDirectory = Property.ofValue("   ");
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        assertThrows(
+            jakarta.validation.ConstraintViolationException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+    }
+
+    @Test
+    void deleteActionDoesNotRequireMoveDirectory() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.DELETE);
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+        assertThat(trigger.performedAction, is(ActionInterface.Action.DELETE));
+        assertThat(trigger.actedPaths, contains("/mnt/incoming/a.csv"));
+    }
+
+    @Test
+    void nullFileMetadataDoesNotBreakDetection() throws Exception {
+        var trigger = new MockTrigger(List.of(
+            new FileInfo()
+                .setPath("/mnt/incoming/a.csv")
+                .setIsDir(false)
+        ));
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        Optional<Execution> first = trigger.evaluate(context.getKey(), context.getValue());
+        assertThat(first.isPresent(), is(true));
+
+        Optional<Execution> second = trigger.evaluate(context.getKey(), context.getValue());
+        assertThat(second.isPresent(), is(false));
+    }
+
+    @Test
+    void nonRecursiveListingDoesNotDescendIntoDirectories() throws Exception {
+        var trigger = new MockTrigger(Map.of(
+            "/mnt/incoming", List.of(
+                new FileInfo()
+                    .setPath("/mnt/incoming/partition=2026-10-05")
+                    .setIsDir(true),
+                file("/mnt/incoming/root.csv", 10L, 100L)
+            ),
+            "/mnt/incoming/partition=2026-10-05", List.of(
+                file("/mnt/incoming/partition=2026-10-05/nested.csv", 20L, 200L)
+            )
+        ));
+        trigger.recursive = Property.ofValue(false);
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+        assertThat(
+            triggeredPaths(execution.get()),
+            contains("/mnt/incoming/root.csv")
+        );
+        assertThat(
+            trigger.listedPaths,
+            contains("/mnt/incoming")
+        );
     }
 
     @Test
@@ -249,6 +419,7 @@ class TriggerTest {
         private List<String> listedPaths = new java.util.ArrayList<>();
         private ActionInterface.Action performedAction;
         private List<String> actedPaths = new java.util.ArrayList<>();
+        private String failingActionPath;
 
         MockTrigger(List<FileInfo> current) {
             this.current = current;
@@ -279,14 +450,19 @@ class TriggerTest {
         }
 
         @Override
-        protected void performAction(
+        protected void performSingleAction(
             WorkspaceClient workspaceClient,
-            List<TriggeredFile> files,
+            TriggeredFile triggeredFile,
             ActionInterface.Action action,
             String moveDirectory
         ) {
+            var filePath = triggeredFile.getFile().getPath();
             performedAction = action;
-            actedPaths = files.stream().map(file -> file.getFile().getPath()).toList();
+            actedPaths.add(filePath);
+
+            if (filePath.equals(failingActionPath)) {
+                throw new IllegalStateException("simulated action failure");
+            }
         }
 
         @Override
