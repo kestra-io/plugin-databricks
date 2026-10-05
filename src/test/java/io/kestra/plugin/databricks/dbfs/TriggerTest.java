@@ -14,7 +14,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
