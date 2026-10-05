@@ -4,14 +4,14 @@ import io.kestra.core.models.annotations.PluginProperty;
 import io.kestra.core.models.property.Property;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
-
 public interface ActionInterface {
     @Schema(
         title = "Post-processing action",
-        description = "MOVE, DELETE, or NONE (caller handles cleanup to avoid retriggers)"
+        description = """
+            NONE leaves detected files in place. MOVE relocates each detected file below moveDirectory.
+            DELETE removes detected files after the trigger state is persisted.
+            """
     )
-    @NotNull
     @PluginProperty(group = "main")
     Property<Action> getAction();
 
