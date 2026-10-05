@@ -18,8 +18,8 @@ import org.mockito.ArgumentCaptor;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.mixin.DbfsExt;
 import com.databricks.sdk.service.files.Delete;
-import com.databricks.sdk.service.files.Move;
 import com.databricks.sdk.service.files.FileInfo;
+import com.databricks.sdk.service.files.Move;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
