@@ -6,15 +6,19 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import com.databricks.sdk.WorkspaceClient;
+import com.databricks.sdk.mixin.DbfsExt;
+import com.databricks.sdk.service.files.Delete;
+import com.databricks.sdk.service.files.Move;
 import com.databricks.sdk.service.files.FileInfo;
 
 import io.kestra.core.junit.annotations.KestraTest;
@@ -30,6 +34,15 @@ import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @KestraTest
 class TriggerTest {
@@ -60,14 +73,14 @@ class TriggerTest {
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        Optional<Execution> first = trigger.evaluate(context.getKey(), context.getValue());
+        var first = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(first.isPresent(), is(true));
         assertThat(triggeredPaths(first.get()), contains(
             "/mnt/incoming/a.csv",
             "/mnt/incoming/partition=2026-10-03/b.csv"
         ));
 
-        Optional<Execution> second = trigger.evaluate(context.getKey(), context.getValue());
+        var second = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(second.isPresent(), is(false));
     }
 
@@ -82,7 +95,7 @@ class TriggerTest {
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(true));
-        Optional<Execution> update = trigger.evaluate(context.getKey(), context.getValue());
+        var update = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(update.isPresent(), is(true));
         assertThat(triggeredPaths(update.get()), contains("/mnt/incoming/a.csv"));
     }
@@ -98,7 +111,7 @@ class TriggerTest {
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
-        Optional<Execution> update = trigger.evaluate(context.getKey(), context.getValue());
+        var update = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(update.isPresent(), is(true));
         assertThat(triggeredPaths(update.get()), contains("/mnt/incoming/a.csv"));
     }
@@ -141,7 +154,7 @@ class TriggerTest {
         assertThat(trigger.evaluate(context.getKey(), context.getValue()).isPresent(), is(false));
 
         trigger.current = List.of(file("/mnt/incoming/a.csv", 10L, 100L));
-        Optional<Execution> recreated = trigger.evaluate(context.getKey(), context.getValue());
+        var recreated = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(recreated.isPresent(), is(true));
     }
 
@@ -156,10 +169,10 @@ class TriggerTest {
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        Optional<Execution> first = trigger.evaluate(context.getKey(), context.getValue());
+        var first = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(triggeredPaths(first.get()), contains("/mnt/incoming/a.csv", "/mnt/incoming/b.csv"));
 
-        Optional<Execution> second = trigger.evaluate(context.getKey(), context.getValue());
+        var second = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(triggeredPaths(second.get()), contains("/mnt/incoming/c.csv"));
     }
 
@@ -170,7 +183,7 @@ class TriggerTest {
         trigger.moveDirectory = Property.ofValue("/mnt/archive");
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
-        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+        var execution = trigger.evaluate(context.getKey(), context.getValue());
 
         assertThat(execution.isPresent(), is(true));
         assertThat(trigger.performedAction, is(ActionInterface.Action.MOVE));
@@ -188,7 +201,7 @@ class TriggerTest {
         trigger.failingActionPath = "/mnt/incoming/a.csv";
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
-        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+        var execution = trigger.evaluate(context.getKey(), context.getValue());
 
         assertThat(execution.isPresent(), is(true));
         assertThat(triggeredPaths(execution.get()), contains(
@@ -263,6 +276,124 @@ class TriggerTest {
     }
 
     @Test
+    void invalidRegexProducesHelpfulError() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.regExp = Property.ofValue("[");
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+        assertThat(exception.getMessage(), is("Invalid `regExp`: ["));
+    }
+
+    @Test
+    void maxFilesHonorsDeclaredBounds() {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+
+        for (var value : List.of(0, 1001)) {
+            trigger.maxFiles = Property.ofValue(value);
+
+            var violations = validator.validate(trigger);
+
+            assertThat(
+                violations.stream()
+                    .anyMatch(v -> v.getPropertyPath().toString().equals("maxFiles")),
+                is(true)
+            );
+        }
+    }
+
+    @Test
+    void recursiveMoveCannotTargetWatchedDirectory() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.recursive = Property.ofValue(true);
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+        trigger.moveDirectory = Property.ofValue("/mnt/incoming/archive");
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        var exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> trigger.evaluate(context.getKey(), context.getValue())
+        );
+        assertThat(
+            exception.getMessage(),
+            is("moveDirectory must be outside the watched `from` path when recursive is enabled: /mnt/incoming/archive")
+        );
+    }
+
+    @Test
+    void moveActionInvokesDbfsMoveAndPreservesRelativePath() throws Exception {
+        assertMoveDestination("/mnt/archive", "/mnt/archive/partition=2026-10-05/a.csv");
+        assertMoveDestination("/mnt/archive/", "/mnt/archive/partition=2026-10-05/a.csv");
+    }
+
+    @Test
+    void deleteActionInvokesDbfsDelete() throws Exception {
+        var dbfs = mock(DbfsExt.class);
+        var client = mock(WorkspaceClient.class);
+        when(client.dbfs()).thenReturn(dbfs);
+
+        var trigger = Trigger.builder()
+            .id("dbfs-trigger-test-" + IdUtils.create())
+            .type(Trigger.class.getName())
+            .from(Property.ofValue("/mnt/incoming"))
+            .stateKey(Property.ofValue("dbfs-trigger-state-" + IdUtils.create()))
+            .action(Property.ofValue(ActionInterface.Action.DELETE))
+            .build();
+
+        var spied = spy(trigger);
+        doReturn(client).when(spied).workspaceClient(any());
+        doReturn(List.of(file("/mnt/incoming/a.csv", 10L, 100L)))
+            .when(spied)
+            .listFiles(any(WorkspaceClient.class), anyString(), anyBoolean());
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        var execution = spied.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+
+        var request = ArgumentCaptor.forClass(Delete.class);
+        verify(dbfs).delete(request.capture());
+        assertThat(request.getValue().getPath(), is("/mnt/incoming/a.csv"));
+    }
+
+    private void assertMoveDestination(String moveDirectory, String expectedDestination) throws Exception {
+        var dbfs = mock(DbfsExt.class);
+        var client = mock(WorkspaceClient.class);
+        when(client.dbfs()).thenReturn(dbfs);
+
+        var trigger = Trigger.builder()
+            .id("dbfs-trigger-test-" + IdUtils.create())
+            .type(Trigger.class.getName())
+            .from(Property.ofValue("/mnt/incoming"))
+            .stateKey(Property.ofValue("dbfs-trigger-state-" + IdUtils.create()))
+            .recursive(Property.ofValue(true))
+            .action(Property.ofValue(ActionInterface.Action.MOVE))
+            .moveDirectory(Property.ofValue(moveDirectory))
+            .build();
+
+        var spied = spy(trigger);
+        doReturn(client).when(spied).workspaceClient(any());
+        doReturn(List.of(file("/mnt/incoming/partition=2026-10-05/a.csv", 10L, 100L)))
+            .when(spied)
+            .listFiles(any(WorkspaceClient.class), anyString(), anyBoolean());
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        var execution = spied.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+
+        var request = ArgumentCaptor.forClass(Move.class);
+        verify(dbfs).move(request.capture());
+        assertThat(request.getValue().getSourcePath(), is("/mnt/incoming/partition=2026-10-05/a.csv"));
+        assertThat(request.getValue().getDestinationPath(), is(expectedDestination));
+    }
+
+    @Test
     void relativeMoveDirectoryIsRejected() throws Exception {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
@@ -285,7 +416,7 @@ class TriggerTest {
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
         assertThrows(
-            jakarta.validation.ConstraintViolationException.class,
+            ConstraintViolationException.class,
             () -> trigger.evaluate(context.getKey(), context.getValue())
         );
     }
@@ -296,7 +427,7 @@ class TriggerTest {
         trigger.action = Property.ofValue(ActionInterface.Action.DELETE);
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
-        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+        var execution = trigger.evaluate(context.getKey(), context.getValue());
 
         assertThat(execution.isPresent(), is(true));
         assertThat(trigger.performedAction, is(ActionInterface.Action.DELETE));
@@ -313,10 +444,10 @@ class TriggerTest {
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        Optional<Execution> first = trigger.evaluate(context.getKey(), context.getValue());
+        var first = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(first.isPresent(), is(true));
 
-        Optional<Execution> second = trigger.evaluate(context.getKey(), context.getValue());
+        var second = trigger.evaluate(context.getKey(), context.getValue());
         assertThat(second.isPresent(), is(false));
     }
 
@@ -336,7 +467,7 @@ class TriggerTest {
         trigger.recursive = Property.ofValue(false);
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
-        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+        var execution = trigger.evaluate(context.getKey(), context.getValue());
 
         assertThat(execution.isPresent(), is(true));
         assertThat(
@@ -390,7 +521,7 @@ class TriggerTest {
         trigger.regExp = Property.ofValue(".*/b\\.csv");
 
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
-        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+        var execution = trigger.evaluate(context.getKey(), context.getValue());
 
         assertThat(execution.isPresent(), is(true));
         assertThat(triggeredPaths(execution.get()), contains("/mnt/incoming/partition=2026-10-03/b.csv"));
@@ -416,9 +547,9 @@ class TriggerTest {
         private List<FileInfo> current;
         private List<FileInfo> next;
         private Map<String, List<FileInfo>> directories;
-        private List<String> listedPaths = new java.util.ArrayList<>();
+        private List<String> listedPaths = new ArrayList<>();
         private ActionInterface.Action performedAction;
-        private List<String> actedPaths = new java.util.ArrayList<>();
+        private List<String> actedPaths = new ArrayList<>();
         private String failingActionPath;
 
         MockTrigger(List<FileInfo> current) {
