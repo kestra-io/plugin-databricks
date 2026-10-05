@@ -17,6 +17,7 @@ import com.databricks.sdk.service.files.FileInfo;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.triggers.ActionInterface;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.StatefulTriggerInterface;
 import io.kestra.core.runners.RunContext;
@@ -138,6 +139,48 @@ class TriggerTest {
     }
 
     @Test
+    void maxFilesLimitsOneExecutionAndLeavesRemainingFilesForNextPoll() throws Exception {
+        var trigger = new MockTrigger(List.of(
+            file("/mnt/incoming/a.csv", 10L, 100L),
+            file("/mnt/incoming/b.csv", 20L, 200L),
+            file("/mnt/incoming/c.csv", 30L, 300L)
+        ));
+        trigger.maxFiles = Property.ofValue(2);
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        Optional<Execution> first = trigger.evaluate(context.getKey(), context.getValue());
+        assertThat(triggeredPaths(first.get()), contains("/mnt/incoming/a.csv", "/mnt/incoming/b.csv"));
+
+        Optional<Execution> second = trigger.evaluate(context.getKey(), context.getValue());
+        assertThat(triggeredPaths(second.get()), contains("/mnt/incoming/c.csv"));
+    }
+
+    @Test
+    void performsConfiguredActionAfterDetection() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+        trigger.moveDirectory = Property.ofValue("/mnt/archive");
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+        Optional<Execution> execution = trigger.evaluate(context.getKey(), context.getValue());
+
+        assertThat(execution.isPresent(), is(true));
+        assertThat(trigger.performedAction, is(ActionInterface.Action.MOVE));
+        assertThat(trigger.actedPaths, contains("/mnt/incoming/a.csv"));
+    }
+
+    @Test
+    void moveActionRequiresMoveDirectory() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
+
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        assertThrows(IllegalArgumentException.class, () -> trigger.evaluate(context.getKey(), context.getValue()));
+    }
+
+    @Test
     void emptyDirectoryDoesNotTrigger() throws Exception {
         var trigger = new MockTrigger(List.of());
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
@@ -205,6 +248,8 @@ class TriggerTest {
         private List<FileInfo> next;
         private Map<String, List<FileInfo>> directories;
         private List<String> listedPaths = new java.util.ArrayList<>();
+        private ActionInterface.Action performedAction;
+        private List<String> actedPaths = new java.util.ArrayList<>();
 
         MockTrigger(List<FileInfo> current) {
             this.current = current;
@@ -230,8 +275,19 @@ class TriggerTest {
         }
 
         @Override
-        protected WorkspaceClient workspaceClient(RunContext runContext) {
+        public WorkspaceClient workspaceClient(RunContext runContext) {
             return null;
+        }
+
+        @Override
+        protected void performAction(
+            WorkspaceClient workspaceClient,
+            List<TriggeredFile> files,
+            ActionInterface.Action action,
+            String moveDirectory
+        ) {
+            performedAction = action;
+            actedPaths = files.stream().map(file -> file.getFile().getPath()).toList();
         }
 
         @Override
