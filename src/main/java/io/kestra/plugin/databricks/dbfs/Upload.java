@@ -64,8 +64,8 @@ import lombok.experimental.SuperBuilder;
     }
 )
 @Schema(
-    title = "Upload a file to DBFS",
-    description = "Streams a file from Kestra internal storage to DBFS; suited for large files."
+    title = "Upload a file to DBFS (Legacy)",
+    description = "Streams a file from Kestra internal storage to DBFS; suited for large files. Note: Databricks considers DBFS legacy; for new flows, use `io.kestra.plugin.databricks.unitycatalog.volume.Upload` instead."
 )
 public class Upload extends AbstractTask implements RunnableTask<VoidOutput> {
     @Schema(

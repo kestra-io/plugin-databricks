@@ -61,8 +61,8 @@ import io.kestra.core.models.annotations.PluginProperty;
     }
 )
 @Schema(
-    title = "Download a file from DBFS",
-    description = "Streams a DBFS file to a temp file in Kestra internal storage; returns the storage URI."
+    title = "Download a file from DBFS (Legacy)",
+    description = "Streams a DBFS file to a temp file in Kestra internal storage; returns the storage URI. Note: Databricks considers DBFS legacy; for new flows, use `io.kestra.plugin.databricks.unitycatalog.volume.Download` instead."
 )
 public class Download extends AbstractTask implements RunnableTask<Download.Output> {
     @Schema(
