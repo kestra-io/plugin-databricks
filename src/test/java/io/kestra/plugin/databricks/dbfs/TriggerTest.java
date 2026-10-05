@@ -18,7 +18,6 @@ import com.databricks.sdk.service.files.FileInfo;
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
-import io.kestra.core.models.triggers.ActionInterface;
 import io.kestra.core.models.triggers.StatefulTriggerInterface;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
