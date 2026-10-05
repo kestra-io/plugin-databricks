@@ -320,7 +320,7 @@ public class Trigger extends AbstractTrigger
                 runContext.logger().warn(
                     "Reached maxFiles ({}), remaining DBFS files under '{}' will be evaluated on the next poll",
                     rMaxFiles,
-                    path
+                    rPath
                 );
                 break;
             }
