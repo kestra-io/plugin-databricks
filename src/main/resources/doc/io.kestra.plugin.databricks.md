@@ -16,7 +16,7 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 
 `sql.Query` runs a SQL query against a Databricks SQL warehouse — set `host`, `httpPath`, `accessToken`, and `sql`. Optionally scope to a `catalog` and `schema`. Results are streamed to internal storage.
 
-`dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path.
+`dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path. Note: Databricks considers DBFS legacy per [official guidance](https://docs.databricks.com/aws/en/dbfs/unity-catalog); for new flows, use Unity Catalog Volumes tasks (`unitycatalog.volume.Upload` and `unitycatalog.volume.Download`) instead.
 
 `cli.DatabricksCLI` runs Databricks CLI commands in a container — set `commands` (the `host` and authentication are passed to the CLI via environment variables). `cli.DatabricksSQLCLI` runs SQL statements through the Databricks SQL CLI — set `commands` along with the connection properties, and use `outputFiles` to persist the CLI output.
 
