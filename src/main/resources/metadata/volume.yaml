@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.unitycatalog.volume
+name: "volume"
+title: "Unity Catalog - Volumes"
+description: "Tasks that manage Databricks Unity Catalog volumes and upload or download the files they hold."
+body: "Use these tasks to create managed or external volumes and to move files in and out of them with the Databricks Files API, the replacement for DBFS. Upload and Download take a volumePath in the form /Volumes/catalog/schema/volume/path; the volume must exist first."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
