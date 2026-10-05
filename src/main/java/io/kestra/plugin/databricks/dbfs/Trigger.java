@@ -61,8 +61,8 @@ import lombok.experimental.SuperBuilder;
         Periodically lists a DBFS path and starts one execution for files detected since the previous poll.
         Directories are ignored as trigger events. The trigger persists file state in Kestra's namespace KV store
         to avoid duplicate events. The first poll reports existing matching files as CREATE events; the default
-        `on` mode is CREATE_OR_UPDATE. DBFS listings are materialized during each poll, so keep recursively
-        watched trees to a few thousand files to avoid excessive memory usage.
+        `on` mode is CREATE_OR_UPDATE. Recursive traversal uses explicit visited-directory tracking, while listings
+        are materialized during each poll; keep recursively watched trees to a few thousand files to avoid excessive memory usage.
         """
 )
 @Plugin(
