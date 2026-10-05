@@ -286,33 +286,6 @@ public class Trigger extends AbstractTrigger
         return result;
     }
 
-    /**
-     * Creates the Databricks workspace client using the same authentication properties as tasks.
-     */
-    protected WorkspaceClient workspaceClient(RunContext runContext) throws IllegalVariableEvaluationException {
-        DatabricksConfig cfg = new DatabricksConfig()
-            .setHost(runContext.render(host).as(String.class).orElse(null))
-            .setAccountId(runContext.render(accountId).as(String.class).orElse(null))
-            .setConfigFile(runContext.render(configFile).as(String.class).orElse(null));
-
-        if (authentication != null) {
-            cfg.setAuthType(runContext.render(authentication.getAuthType()).as(String.class).orElse(null))
-                .setToken(runContext.render(authentication.getToken()).as(String.class).orElse(null))
-                .setUsername(runContext.render(authentication.getUsername()).as(String.class).orElse(null))
-                .setPassword(runContext.render(authentication.getPassword()).as(String.class).orElse(null))
-                .setClientId(runContext.render(authentication.getClientId()).as(String.class).orElse(null))
-                .setClientSecret(runContext.render(authentication.getClientSecret()).as(String.class).orElse(null))
-                .setGoogleCredentials(runContext.render(authentication.getGoogleCredentials()).as(String.class).orElse(null))
-                .setGoogleServiceAccount(runContext.render(authentication.getGoogleServiceAccount()).as(String.class).orElse(null))
-                .setAzureClientId(runContext.render(authentication.getAzureClientId()).as(String.class).orElse(null))
-                .setAzureClientSecret(runContext.render(authentication.getAzureClientSecret()).as(String.class).orElse(null))
-                .setAzureTenantId(runContext.render(authentication.getAzureTenantId()).as(String.class).orElse(null));
-        }
-
-        ConfigLoader.resolve(cfg);
-        return new WorkspaceClient(cfg);
-    }
-
     protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
         return workspaceClient.dbfs().list(path);
     }
