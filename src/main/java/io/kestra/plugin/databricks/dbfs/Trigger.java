@@ -7,10 +7,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 import com.databricks.sdk.WorkspaceClient;
@@ -40,6 +39,8 @@ import io.kestra.plugin.databricks.DatabricksConnectionInterface;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -58,11 +59,10 @@ import lombok.experimental.SuperBuilder;
     title = "Trigger on new DBFS files",
     description = """
         Periodically lists a DBFS path and starts one execution for files detected since the previous poll.
-        Directories are ignored as trigger events. DBFS listing can time out on very large directories;
-        keep watched directories reasonably bounded. Set `recursive` to true to monitor files below
-        partition directories.
-        The trigger persists file state in Kestra's namespace KV store to avoid duplicate events.
-        The first poll reports existing matching files as CREATE events; the default `on` mode is CREATE_OR_UPDATE.
+        Directories are ignored as trigger events. The trigger persists file state in Kestra's namespace KV store
+        to avoid duplicate events. The first poll reports existing matching files as CREATE events; the default
+        `on` mode is CREATE_OR_UPDATE. DBFS listings are materialized during each poll, so keep recursively
+        watched trees to a few thousand files to avoid excessive memory usage.
         """
 )
 @Plugin(
@@ -127,7 +127,10 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "DBFS path to watch",
-        description = "Absolute DBFS directory path to watch, such as `/mnt/incoming`."
+        description = """
+            Absolute DBFS directory path to watch, such as `/mnt/incoming`.
+            The rendered value must be an absolute DBFS path.
+            """
     )
     @NotNull
     @PluginProperty(group = "main")
@@ -140,7 +143,11 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "Include files in subdirectories",
-        description = "When enabled, files below nested DBFS directories are monitored recursively."
+        description = """
+            When enabled, files below nested DBFS directories are monitored recursively.
+            Because the listing is materialized on each poll, keep recursively watched trees to a few thousand files.
+            When `action: MOVE` is used with recursive polling, `moveDirectory` must be outside `from`.
+            """
     )
     @Builder.Default
     @PluginProperty(group = "advanced")
@@ -148,14 +155,19 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "Regex pattern to match DBFS paths",
-        description = "Optional regular expression matched against the complete DBFS path of each file."
+        description = """
+            Optional regular expression matched against the complete DBFS path of each file.
+            Invalid expressions fail validation at runtime with an error naming this property.
+            """
     )
     @PluginProperty(group = "advanced")
     protected Property<String> regExp;
 
     @Schema(
         title = "Trigger condition",
-        description = "Which file changes fire the trigger. Defaults to CREATE_OR_UPDATE."
+        description = """
+            Which file changes fire the trigger. Defaults to CREATE_OR_UPDATE.
+            """
     )
     @Builder.Default
     @PluginProperty(group = "advanced")
@@ -163,14 +175,19 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "State key",
-        description = "Key used to persist the trigger state. Defaults to a stable per-trigger key."
+        description = """
+            Key used to persist the trigger state. Defaults to a stable per-trigger key.
+            """
     )
     @PluginProperty(group = "advanced")
     protected Property<String> stateKey;
 
     @Schema(
         title = "State TTL",
-        description = "How long the persisted trigger state is retained. Unset means no expiry."
+        description = """
+            How long the persisted trigger state is retained.
+            Unset means no expiry.
+            """
     )
     @PluginProperty(group = "advanced")
     private Property<Duration> stateTtl;
@@ -178,24 +195,38 @@ public class Trigger extends AbstractTrigger
 
     @Schema(
         title = "Maximum files per execution",
-        description = "Maximum number of detected files emitted by a single poll. Remaining files are evaluated on the next poll."
+        description = """
+            Maximum number of detected files emitted by a single poll.
+            Must be between 1 and 1000. The default is 25. Remaining files are evaluated on the next poll.
+            """
     )
     @Builder.Default
     @PluginProperty(group = "execution")
+    @Min(1)
+    @Max(1000)
     protected Property<Integer> maxFiles = Property.ofValue(25);
 
 
     @Schema(
         title = "Post-detection action",
-        description = "NONE (default), MOVE to move detected files, or DELETE to remove them after state is persisted."
+        description = """
+            NONE leaves detected files in place. MOVE relocates each detected file below `moveDirectory`,
+            preserving its relative path under `from`. DELETE removes detected files after state is persisted.
+            Failed actions are logged and do not cancel the trigger execution.
+            """
     )
     @Builder.Default
+    @PluginProperty(group = "main")
     protected Property<ActionInterface.Action> action = Property.ofValue(ActionInterface.Action.NONE);
 
 
     @Schema(
         title = "Move destination",
-        description = "Target DBFS directory when action is MOVE."
+        description = """
+            Target DBFS directory when action is MOVE.
+            For recursive polling, the relative path below `from` is preserved under this directory.
+            The destination must not be inside the watched `from` path when recursive polling is enabled.
+            """
     )
     @PluginProperty(group = "advanced")
     protected Property<String> moveDirectory;
@@ -227,12 +258,13 @@ public class Trigger extends AbstractTrigger
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
-        var path = runContext.render(from).as(String.class).orElseThrow();
-        if (path.isBlank() || !path.startsWith("/")) {
-            throw new IllegalArgumentException("DBFS path must be absolute and start with '/': " + path);
+        var rPath = runContext.render(from).as(String.class)
+            .orElseThrow(() -> new IllegalArgumentException("`from` is required: set it to an absolute DBFS directory such as /mnt/incoming"));
+        if (rPath.isBlank() || !rPath.startsWith("/")) {
+            throw new IllegalArgumentException("DBFS path must be absolute and start with '/': " + rPath);
         }
 
-        var recursiveFiles = runContext.render(recursive).as(Boolean.class).orElse(false);
+        var rRecursive = runContext.render(recursive).as(Boolean.class).orElse(false);
         var rOn = runContext.render(on).as(On.class).orElse(On.CREATE_OR_UPDATE);
         var rStateKey = runContext.render(stateKey).as(String.class)
             .orElseGet(() -> StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id));
@@ -249,24 +281,36 @@ public class Trigger extends AbstractTrigger
         if (rAction == ActionInterface.Action.MOVE && !rMoveDirectory.startsWith("/")) {
             throw new IllegalArgumentException("moveDirectory must be an absolute DBFS path: " + rMoveDirectory);
         }
-        var regexp = runContext.render(regExp).as(String.class).map(Pattern::compile).orElse(null);
+        if (rAction == ActionInterface.Action.MOVE && rRecursive && isSameOrDescendantPath(rPath, rMoveDirectory)) {
+            throw new IllegalArgumentException("moveDirectory must be outside the watched `from` path when recursive is enabled: " + rMoveDirectory);
+        }
+
+        var rRegExp = runContext.render(regExp).as(String.class).orElse(null);
+        var rRegExpPattern = Optional.ofNullable(rRegExp)
+            .map(value -> {
+                try {
+                    return Pattern.compile(value);
+                } catch (PatternSyntaxException e) {
+                    throw new IllegalArgumentException("Invalid `regExp`: " + value, e);
+                }
+            })
+            .orElse(null);
 
         var workspaceClient = workspaceClient(runContext);
-        var listedFiles = listFiles(workspaceClient, path, recursiveFiles).stream()
+        var listedFiles = listFiles(workspaceClient, rPath, rRecursive).stream()
             .filter(file -> !Boolean.TRUE.equals(file.getIsDir()))
             .filter(file -> file.getPath() != null)
             .sorted(Comparator.comparing(FileInfo::getPath))
             .toList();
 
-        Map<String, StatefulTriggerService.Entry> state =
-            StatefulTriggerService.readState(runContext, rStateKey, rStateTtl);
+        var state = StatefulTriggerService.readState(runContext, rStateKey, rStateTtl);
 
-        Set<String> seen = listedFiles.stream()
+        var seen = listedFiles.stream()
             .map(FileInfo::getPath)
             .collect(Collectors.toSet());
 
         var files = listedFiles.stream()
-            .filter(file -> regexp == null || regexp.matcher(file.getPath()).matches())
+            .filter(file -> rRegExpPattern == null || rRegExpPattern.matcher(file.getPath()).matches())
             .toList();
 
         var detected = new ArrayList<TriggeredFile>();
@@ -307,7 +351,6 @@ public class Trigger extends AbstractTrigger
             }
         }
 
-        // Forget files that disappeared so a file recreated at the same path is detected again.
         state.keySet().retainAll(seen);
         StatefulTriggerService.writeState(runContext, rStateKey, state, rStateTtl);
 
@@ -315,12 +358,12 @@ public class Trigger extends AbstractTrigger
             return Optional.empty();
         }
 
-        performAction(workspaceClient, detected, rAction, rMoveDirectory, runContext);
+        performAction(workspaceClient, detected, rAction, rMoveDirectory, rPath, runContext);
 
         runContext.logger().info(
             "Detected {} DBFS file(s) under '{}'",
             detected.size(),
-            path
+            rPath
         );
 
         return Optional.of(
@@ -336,11 +379,7 @@ public class Trigger extends AbstractTrigger
         );
     }
 
-    /**
-     * Lists DBFS entries using the Databricks SDK. The SDK handles pagination for each directory listing.
-     * Recursive traversal is implemented here because the DBFS SDK exposes pagination for list(), not
-     * a recursive-list operation.
-     */
+    /** Recursive traversal is needed because the DBFS SDK list() operation is not recursive. */
     protected List<FileInfo> listFiles(WorkspaceClient workspaceClient, String path, boolean recursive) {
         var result = new ArrayList<FileInfo>();
         var directories = new ArrayDeque<String>();
@@ -374,6 +413,7 @@ public class Trigger extends AbstractTrigger
         List<TriggeredFile> files,
         ActionInterface.Action rAction,
         String rMoveDirectory,
+        String rFrom,
         RunContext runContext
     ) {
         if (rAction == ActionInterface.Action.NONE) {
@@ -384,7 +424,7 @@ public class Trigger extends AbstractTrigger
             var filePath = triggeredFile.getFile().getPath();
 
             try {
-                performSingleAction(workspaceClient, triggeredFile, rAction, rMoveDirectory);
+                performSingleAction(workspaceClient, triggeredFile, rAction, rMoveDirectory, rFrom);
             } catch (Exception e) {
                 runContext.logger().warn(
                     "Failed to {} DBFS file '{}': {}",
@@ -401,7 +441,8 @@ public class Trigger extends AbstractTrigger
         WorkspaceClient workspaceClient,
         TriggeredFile triggeredFile,
         ActionInterface.Action rAction,
-        String rMoveDirectory
+        String rMoveDirectory,
+        String rFrom
     ) {
         var filePath = triggeredFile.getFile().getPath();
 
@@ -409,15 +450,54 @@ public class Trigger extends AbstractTrigger
             case MOVE -> workspaceClient.dbfs().move(
                 new Move()
                     .setSourcePath(filePath)
-                    .setDestinationPath(
-                        rMoveDirectory.endsWith("/")
-                            ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
-                            : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
-                    )
+                    .setDestinationPath(moveDestination(rFrom, rMoveDirectory, filePath))
             );
             case DELETE -> workspaceClient.dbfs().delete(new Delete().setPath(filePath));
             case NONE -> { }
         }
+    }
+
+    private static String moveDestination(String rFrom, String rMoveDirectory, String filePath) {
+        var normalizedFrom = normalizeDbfsDirectory(rFrom);
+        var normalizedMoveDirectory = normalizeDbfsDirectory(rMoveDirectory);
+        var normalizedFilePath = normalizeDbfsDirectory(filePath);
+
+        var relativePath;
+        if (`/`.equals(normalizedFrom)) {
+            relativePath = normalizedFilePath.substring(1);
+        } else {
+            var prefix = normalizedFrom + `/`;
+            if (!normalizedFilePath.startsWith(prefix)) {
+                throw new IllegalArgumentException(
+                    "Detected DBFS file is outside the watched `from` path: " + filePath
+                );
+            }
+            relativePath = normalizedFilePath.substring(prefix.length());
+        }
+
+        if (relativePath.isBlank()) {
+            throw new IllegalArgumentException("Detected DBFS file path is empty: " + filePath);
+        }
+
+        return `/`.equals(normalizedMoveDirectory)
+            ? `/` + relativePath
+            : normalizedMoveDirectory + `/` + relativePath;
+    }
+
+    private static String normalizeDbfsDirectory(String path) {
+        if (path.length() > 1 && path.endsWith(`/`)) {
+            return path.substring(0, path.length() - 1);
+        }
+        return path;
+    }
+
+    private static boolean isSameOrDescendantPath(String root, String candidate) {
+        var normalizedRoot = normalizeDbfsDirectory(root);
+        var normalizedCandidate = normalizeDbfsDirectory(candidate);
+
+        return `/`.equals(normalizedRoot)
+            || normalizedCandidate.equals(normalizedRoot)
+            || normalizedCandidate.startsWith(normalizedRoot + `/`);
     }
 
     protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
@@ -433,8 +513,14 @@ public class Trigger extends AbstractTrigger
     @AllArgsConstructor
     @Builder
     public static class TriggeredFile {
+        @Schema(
+            title = "DBFS file metadata",
+            description = "Unwrapped DBFS metadata including path, fileSize, modificationTime, and isDir."
+        )
         @JsonUnwrapped
         private final FileInfo file;
+
+        @Schema(title = "Detected change type: CREATE for a newly observed file or UPDATE for changed metadata")
         private final ChangeType changeType;
     }
 
