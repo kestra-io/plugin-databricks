@@ -48,6 +48,27 @@ import io.kestra.core.models.annotations.PluginProperty;
                     commands:
                         - "SELECT * FROM my_catalog.my_schema.my_table LIMIT 10"
                 """
+        ),
+        @Example(
+            title = "Run a SQL file stored as a namespace file.",
+            full = true,
+            code = """
+                id: databricks_cli_query_file
+                namespace: company.team
+
+                tasks:
+                  - id: run_sql_file
+                    type: io.kestra.plugin.databricks.cli.DatabricksSQLCLI
+                    host: "{{ secret('DATABRICKS_HOST') }}"
+                    token: "{{ secret('DATABRICKS_TOKEN') }}"
+                    httpPath: "{{ secret('DATABRICKS_HTTP_PATH') }}"
+                    namespaceFiles:
+                      enabled: true
+                      include:
+                        - query.sql
+                    commands:
+                      - query.sql
+                """
         )
     }
 )
@@ -124,6 +145,10 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
     private DockerOptions docker;
 
     @PluginProperty(group = "source")
+    @Schema(title = "Namespace files", description = "Namespace files to make available to the CLI in the working directory.")
+    private NamespaceFiles namespaceFiles;
+
+    @PluginProperty(group = "source")
     @Schema(title = "Input files", description = "Files to make available to the CLI in the working directory, as a map of file name to content or a list of paths/URIs.")
     private Object inputFiles;
 
@@ -144,10 +169,11 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         return new CommandsWrapper(runContext)
             .withTaskRunner(this.taskRunner)
             .withDockerOptions(injectDefaults(this.getDocker()))
-            .withContainerImage("databricks-sql-cli")
+            .withContainerImage(runContext.render(this.containerImage).as(String.class).orElseThrow())
             .withInterpreter(Property.ofValue(List.of("/bin/sh", "-c")))
             .withCommands(Property.ofValue(databricksCommand))
             .withEnv(Map.of("DATABRICKS_TOKEN", token))
+            .withNamespaceFiles(namespaceFiles)
             .withInputFiles(inputFiles)
             .withOutputFiles(renderedOutputFiles.isEmpty() ? null : renderedOutputFiles)
             .run();
@@ -196,15 +222,5 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         }
 
         return builder.build();
-    }
-
-    @Override
-    public Object getInputFiles() {
-        return null;
-    }
-
-    @Override
-    public NamespaceFiles getNamespaceFiles() {
-        return null;
     }
 }
