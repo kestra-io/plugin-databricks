@@ -14,12 +14,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.databricks.sdk.WorkspaceClient;
-import com.databricks.sdk.core.ConfigLoader;
-import com.databricks.sdk.core.DatabricksConfig;
 import com.databricks.sdk.service.files.FileInfo;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
-import io.kestra.core.exceptions.IllegalVariableEvaluationException;
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
 import io.kestra.core.models.annotations.PluginProperty;
@@ -27,6 +24,7 @@ import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
+import io.kestra.core.models.triggers.ActionInterface;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
 import io.kestra.core.models.triggers.StatefulTriggerInterface;
 import io.kestra.core.models.triggers.StatefulTriggerService;
@@ -35,6 +33,7 @@ import io.kestra.core.models.triggers.TriggerOutput;
 import io.kestra.core.models.triggers.TriggerService;
 import io.kestra.core.runners.RunContext;
 import io.kestra.plugin.databricks.AbstractTask;
+import io.kestra.plugin.databricks.DatabricksConnectionInterface;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -72,9 +71,16 @@ import lombok.experimental.SuperBuilder;
                 namespace: company.team
 
                 tasks:
-                  - id: log_files
-                    type: io.kestra.plugin.core.log.Log
-                    message: "Detected DBFS files: {{ trigger.files }}"
+                  - id: each_file
+                    type: io.kestra.plugin.core.flow.ForEach
+                    values: "{{ trigger.files | jq('.[].path') }}"
+                    tasks:
+                      - id: download
+                        type: io.kestra.plugin.databricks.dbfs.Download
+                        host: "{{ secret('DATABRICKS_HOST') }}"
+                        authentication:
+                          token: "{{ secret('DATABRICKS_TOKEN') }}"
+                        from: "{{ taskrun.value }}"
 
                 triggers:
                   - id: watch_dbfs
@@ -91,7 +97,7 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Trigger extends AbstractTrigger
-    implements PollingTriggerInterface, TriggerOutput<Trigger.Output>, StatefulTriggerInterface {
+    implements PollingTriggerInterface, TriggerOutput<Trigger.Output>, StatefulTriggerInterface, DatabricksConnectionInterface {
 
     @Schema(title = "Databricks host")
     @PluginProperty(group = "connection")
@@ -165,6 +171,32 @@ public class Trigger extends AbstractTrigger
     @PluginProperty(group = "advanced")
     private Property<Duration> stateTtl;
 
+
+    @Schema(
+        title = "Maximum files per execution",
+        description = "Maximum number of detected files emitted by a single poll. Remaining files are evaluated on the next poll."
+    )
+    @Builder.Default
+    @PluginProperty(group = "execution")
+    private Property<Integer> maxFiles = Property.ofValue(25);
+
+
+    @Schema(
+        title = "Post-detection action",
+        description = "NONE (default), MOVE to move detected files, or DELETE to remove them after state is persisted."
+    )
+    @Builder.Default
+    @PluginProperty(group = "advanced")
+    private Property<ActionInterface.Action> action = Property.ofValue(ActionInterface.Action.NONE);
+
+
+    @Schema(
+        title = "Move destination",
+        description = "Target DBFS directory when action is MOVE."
+    )
+    @PluginProperty(group = "advanced")
+    private Property<String> moveDirectory;
+
     @Override
     public Optional<Execution> evaluate(ConditionContext conditionContext, TriggerContext context) throws Exception {
         var runContext = conditionContext.getRunContext();
@@ -178,9 +210,22 @@ public class Trigger extends AbstractTrigger
         var rStateKey = runContext.render(stateKey).as(String.class)
             .orElseGet(() -> StatefulTriggerService.defaultKey(context.getNamespace(), context.getFlowId(), id));
         var rStateTtl = runContext.render(stateTtl).as(Duration.class);
+        var rMaxFiles = runContext.render(maxFiles).as(Integer.class).orElse(25);
+        if (rMaxFiles < 1) {
+            throw new IllegalArgumentException("maxFiles must be greater than 0");
+        }
+        var rAction = runContext.render(action).as(ActionInterface.Action.class).orElse(ActionInterface.Action.NONE);
+        var rMoveDirectory = runContext.render(moveDirectory).as(String.class).orElse(null);
+        if (rAction == ActionInterface.Action.MOVE && (rMoveDirectory == null || rMoveDirectory.isBlank())) {
+            throw new IllegalArgumentException("moveDirectory is required when action is MOVE");
+        }
+        if (rAction == ActionInterface.Action.MOVE && !rMoveDirectory.startsWith("/")) {
+            throw new IllegalArgumentException("moveDirectory must be an absolute DBFS path: " + rMoveDirectory);
+        }
         var regexp = runContext.render(regExp).as(String.class).map(Pattern::compile).orElse(null);
 
-        var listedFiles = listFiles(workspaceClient(runContext), path, recursiveFiles).stream()
+        var workspaceClient = workspaceClient(runContext);
+        var listedFiles = listFiles(workspaceClient, path, recursiveFiles).stream()
             .filter(file -> !Boolean.TRUE.equals(file.getIsDir()))
             .filter(file -> file.getPath() != null)
             .sorted(Comparator.comparing(FileInfo::getPath))
@@ -200,6 +245,15 @@ public class Trigger extends AbstractTrigger
         var detected = new ArrayList<TriggeredFile>();
 
         for (var file : files) {
+            if (detected.size() >= rMaxFiles) {
+                runContext.logger().warn(
+                    "Reached maxFiles ({}), remaining DBFS files under '{}' will be evaluated on the next poll",
+                    rMaxFiles,
+                    path
+                );
+                break;
+            }
+
             var pathKey = file.getPath();
             seen.add(pathKey);
 
@@ -233,6 +287,8 @@ public class Trigger extends AbstractTrigger
         if (detected.isEmpty()) {
             return Optional.empty();
         }
+
+        performAction(workspaceClient, detected, rAction, rMoveDirectory);
 
         runContext.logger().info(
             "Detected {} DBFS file(s) under '{}'",
@@ -284,6 +340,31 @@ public class Trigger extends AbstractTrigger
         }
 
         return result;
+    }
+
+    protected void performAction(
+        WorkspaceClient workspaceClient,
+        List<TriggeredFile> files,
+        ActionInterface.Action rAction,
+        String rMoveDirectory
+    ) {
+        if (rAction == ActionInterface.Action.NONE) {
+            return;
+        }
+
+        for (var triggeredFile : files) {
+            var filePath = triggeredFile.getFile().getPath();
+            switch (rAction) {
+                case MOVE -> workspaceClient.dbfs().move(
+                    filePath,
+                    rMoveDirectory.endsWith("/")
+                        ? rMoveDirectory + filePath.substring(filePath.lastIndexOf('/') + 1)
+                        : rMoveDirectory + "/" + filePath.substring(filePath.lastIndexOf('/') + 1)
+                );
+                case DELETE -> workspaceClient.dbfs().delete(filePath);
+                case NONE -> { }
+            }
+        }
     }
 
     protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
