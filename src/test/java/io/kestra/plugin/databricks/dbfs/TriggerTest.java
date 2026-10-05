@@ -209,6 +209,7 @@ class TriggerTest {
         MockTrigger(List<FileInfo> current) {
             this.current = current;
             this.id = "dbfs-trigger-test-" + IdUtils.create();
+            this.type = Trigger.class.getName();
             this.from = Property.ofValue("/mnt/incoming");
             this.stateKey = Property.ofValue("dbfs-trigger-state-" + IdUtils.create());
         }
