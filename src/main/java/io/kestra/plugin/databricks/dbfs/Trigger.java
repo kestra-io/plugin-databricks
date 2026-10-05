@@ -202,9 +202,7 @@ public class Trigger extends AbstractTrigger
     )
     @Builder.Default
     @PluginProperty(group = "execution")
-    @Min(1)
-    @Max(1000)
-    protected Property<Integer> maxFiles = Property.ofValue(25);
+    protected Property<@Min(1) @Max(1000) Integer> maxFiles = Property.ofValue(25);
 
 
     @Schema(
