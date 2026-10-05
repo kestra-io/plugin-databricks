@@ -187,7 +187,6 @@ public class Trigger extends AbstractTrigger
         description = "NONE (default), MOVE to move detected files, or DELETE to remove them after state is persisted."
     )
     @Builder.Default
-    @PluginProperty(group = "advanced")
     protected Property<ActionInterface.Action> action = Property.ofValue(ActionInterface.Action.NONE);
 
 
