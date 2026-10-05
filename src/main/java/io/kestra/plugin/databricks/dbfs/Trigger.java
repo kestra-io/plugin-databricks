@@ -24,7 +24,6 @@ import io.kestra.core.models.conditions.ConditionContext;
 import io.kestra.core.models.executions.Execution;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.AbstractTrigger;
-import io.kestra.core.models.triggers.ActionInterface;
 import io.kestra.core.models.triggers.PollingTriggerInterface;
 import io.kestra.core.models.triggers.StatefulTriggerInterface;
 import io.kestra.core.models.triggers.StatefulTriggerService;
@@ -97,7 +96,7 @@ import lombok.experimental.SuperBuilder;
     }
 )
 public class Trigger extends AbstractTrigger
-    implements PollingTriggerInterface, TriggerOutput<Trigger.Output>, StatefulTriggerInterface, DatabricksConnectionInterface {
+    implements PollingTriggerInterface, TriggerOutput<Trigger.Output>, StatefulTriggerInterface, DatabricksConnectionInterface, ActionInterface {
 
     @Schema(title = "Databricks host")
     @PluginProperty(group = "connection")
