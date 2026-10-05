@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -232,7 +231,7 @@ class TriggerTest {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         trigger.action = Property.ofValue(ActionInterface.Action.MOVE);
 
-        Set<ConstraintViolation<Trigger>> violations = validator.validate(trigger);
+        var violations = validator.validate(trigger);
 
         assertThat(
             violations.stream()
@@ -247,7 +246,7 @@ class TriggerTest {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         trigger.action = Property.ofExpression("{{ inputs.action }}");
 
-        Set<ConstraintViolation<Trigger>> violations = validator.validate(trigger);
+        var violations = validator.validate(trigger);
 
         assertThat(
             violations.stream()
