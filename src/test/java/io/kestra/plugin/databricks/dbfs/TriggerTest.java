@@ -258,17 +258,17 @@ class TriggerTest {
     }
 
     @Test
-    void maxFilesRejectsZeroAndNegativeValues() throws Exception {
+    void templatedMaxFilesRejectsValuesOutsideDeclaredBounds() throws Exception {
         var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
         var context = TestsUtils.mockTrigger(runContextFactory, trigger);
 
-        trigger.maxFiles = Property.ofValue(0);
+        trigger.maxFiles = Property.ofExpression("{{ 0 }}");
         assertThrows(
             IllegalArgumentException.class,
             () -> trigger.evaluate(context.getKey(), context.getValue())
         );
 
-        trigger.maxFiles = Property.ofValue(-1);
+        trigger.maxFiles = Property.ofExpression("{{ 1001 }}");
         assertThrows(
             IllegalArgumentException.class,
             () -> trigger.evaluate(context.getKey(), context.getValue())
@@ -585,7 +585,8 @@ class TriggerTest {
             WorkspaceClient workspaceClient,
             TriggeredFile triggeredFile,
             ActionInterface.Action action,
-            String moveDirectory
+            String moveDirectory,
+            String from
         ) {
             var filePath = triggeredFile.getFile().getPath();
             performedAction = action;
