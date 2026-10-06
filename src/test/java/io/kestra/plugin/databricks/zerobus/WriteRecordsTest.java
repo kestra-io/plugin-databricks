@@ -46,6 +46,8 @@ class WriteRecordsTest {
     private String endpoint;
     private List<Map<String, Object>> receivedRecords;
     private AtomicInteger chunkCount;
+    private AtomicInteger tokenRequestCount;
+    private Long customExpiresIn;
     private int returnStatus = 200;
     private String returnBody = "{}";
     private boolean oauthEndpointCalled = false;
@@ -58,6 +60,8 @@ class WriteRecordsTest {
     void setup() throws IOException {
         receivedRecords = new ArrayList<>();
         chunkCount = new AtomicInteger(0);
+        tokenRequestCount = new AtomicInteger(0);
+        customExpiresIn = null;
         returnStatus = 200;
         returnBody = "{}";
         oauthEndpointCalled = false;
@@ -96,6 +100,7 @@ class WriteRecordsTest {
         server.createContext("/oidc/v1/token", exchange ->
         {
             oauthEndpointCalled = true;
+            int count = tokenRequestCount.incrementAndGet();
             try {
                 tokenRequestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 tokenRequestAuth = exchange.getRequestHeaders().getFirst("Authorization");
@@ -111,7 +116,8 @@ class WriteRecordsTest {
                 if (Boolean.TRUE.equals(returnEmptyTokenResponse)) {
                     response = "{\"some_other_field\": \"value\"}";
                 } else {
-                    response = "{\"access_token\": \"mock_oauth_token\"}";
+                    String exp = customExpiresIn != null ? ", \"expires_in\": " + customExpiresIn : "";
+                    response = "{\"access_token\": \"mock_oauth_token_" + count + "\"" + exp + "}";
                 }
                 exchange.sendResponseHeaders(200, response.length());
                 exchange.getResponseBody().write(response.getBytes(StandardCharsets.UTF_8));
@@ -431,7 +437,18 @@ class WriteRecordsTest {
 
         // Ensure no secrets are leaked
         assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("qa_secret")));
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+            java.io.StringWriter sw = new java.io.StringWriter();
+            cause.printStackTrace(new java.io.PrintWriter(sw));
+            String stackTrace = sw.toString();
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
+        }
 
         long recordCountMetric = runContext.metrics().stream()
             .filter(m -> m.getName().equals("records.count"))
@@ -474,6 +491,21 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("Forbidden"));
         assertThat(ex.getMessage(), containsString("500 records in prior chunks were already accepted"));
         assertThat(ex.getMessage(), containsString("at-least-once delivery"));
+
+        // Ensure no secrets are leaked
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+            java.io.StringWriter sw = new java.io.StringWriter();
+            cause.printStackTrace(new java.io.PrintWriter(sw));
+            String stackTrace = sw.toString();
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
+        }
     }
 
     @Test
@@ -492,6 +524,7 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("Permission Denied"));
         assertThat(ex.getMessage(), containsString("Check that the table 'my_cat.my_schema.my_table' exists"));
         assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
         assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("qa_secret")));
     }
 
@@ -773,6 +806,151 @@ class WriteRecordsTest {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, null);
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
         assertTrue(e.getMessage().contains("Failed to parse record at line 4"), e.getMessage());
+    }
+
+    @Test
+    void shortExpiresInRefreshesBetweenChunks() throws Exception {
+        customExpiresIn = 10L; // < 60 margin
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        List<Map<String, Object>> recs = new ArrayList<>();
+        for (int i = 0; i < WriteRecords.MAX_RECORDS_PER_CHUNK + 1; i++) {
+            recs.add(Map.of("id", i));
+        }
+        WriteRecords task = baseBuilder().records(Property.of(recs)).build();
+
+        final List<String> authHeaders = new ArrayList<>();
+        server.removeContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert");
+        server.createContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert", exchange ->
+        {
+            authHeaders.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            exchange.sendResponseHeaders(200, 2);
+            exchange.getResponseBody().write("{}".getBytes());
+            exchange.close();
+        });
+
+        WriteRecords.Output output = task.run(runContext);
+        assertThat(output.getRecordsCount(), is((long) WriteRecords.MAX_RECORDS_PER_CHUNK + 1));
+        assertThat(tokenRequestCount.get(), is(2)); // Fetched initially and then refreshed for the second chunk
+        assertThat(authHeaders.size(), is(2));
+        assertThat(authHeaders.get(0), is("Bearer mock_oauth_token_1"));
+        assertThat(authHeaders.get(1), is("Bearer mock_oauth_token_2"));
+    }
+
+    @Test
+    void normalExpiresInOverThreeChunksHitsTokenEndpointOnce() throws Exception {
+        customExpiresIn = 3600L;
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        List<Map<String, Object>> recs = new ArrayList<>();
+        for (int i = 0; i < WriteRecords.MAX_RECORDS_PER_CHUNK * 2 + 1; i++) {
+            recs.add(Map.of("id", i));
+        }
+        WriteRecords task = baseBuilder().records(Property.of(recs)).build();
+
+        WriteRecords.Output output = task.run(runContext);
+        assertThat(output.getRecordsCount(), is((long) WriteRecords.MAX_RECORDS_PER_CHUNK * 2 + 1));
+        assertThat(chunkCount.get(), is(3));
+        assertThat(tokenRequestCount.get(), is(1));
+    }
+
+    @Test
+    void one401OnIngestRecovers() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder().records(Property.of(List.of(Map.of("id", 1)))).build();
+
+        AtomicInteger chunkAttempts = new AtomicInteger(0);
+        server.removeContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert");
+        server.createContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert", exchange ->
+        {
+            int attempt = chunkAttempts.incrementAndGet();
+            if (attempt == 1) {
+                exchange.sendResponseHeaders(401, 2);
+                exchange.getResponseBody().write("{}".getBytes());
+            } else {
+                chunkCount.incrementAndGet();
+                exchange.sendResponseHeaders(200, 2);
+                exchange.getResponseBody().write("{}".getBytes());
+            }
+            exchange.close();
+        });
+
+        WriteRecords.Output output = task.run(runContext);
+        assertThat(output.getRecordsCount(), is(1L));
+        assertThat(chunkAttempts.get(), is(2));
+        assertThat(tokenRequestCount.get(), is(2)); // Initial fetch + retry fetch
+    }
+
+    @Test
+    void two401sFailWithClearMessage() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder().records(Property.of(List.of(Map.of("id", 1)))).build();
+
+        server.removeContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert");
+        server.createContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert", exchange ->
+        {
+            exchange.sendResponseHeaders(401, 2);
+            exchange.getResponseBody().write("{}".getBytes());
+            exchange.close();
+        });
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("Zerobus Ingest returned a 401 Unauthorized even after refreshing the OAuth token. 0 records in prior chunks were already accepted"));
+        assertThat(tokenRequestCount.get(), is(2));
+
+        // Ensure no secrets are leaked
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+
+        Throwable cause = ex.getCause();
+        if (cause != null) {
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+            java.io.StringWriter sw = new java.io.StringWriter();
+            cause.printStackTrace(new java.io.PrintWriter(sw));
+            String stackTrace = sw.toString();
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
+        }
+    }
+
+    @Test
+    void pat401FailsWithoutTokenEndpointHit() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder()
+            .authentication(
+                AuthenticationConfig.builder()
+                    .token(Property.of("my_pat_token"))
+                    .build()
+            )
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        server.removeContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert");
+        server.createContext("/zerobus/v1/tables/my_cat.my_schema.my_table/insert", exchange ->
+        {
+            exchange.sendResponseHeaders(401, 2);
+            exchange.getResponseBody().write("{}".getBytes());
+            exchange.close();
+        });
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), containsString("Zerobus Ingest rejected the request (HTTP 401)"));
+        assertThat(tokenRequestCount.get(), is(0));
+    }
+
+    @Test
+    void missingExpiresInDefaultsToNoRefresh() throws Exception {
+        customExpiresIn = null;
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        List<Map<String, Object>> recs = new ArrayList<>();
+        for (int i = 0; i < WriteRecords.MAX_RECORDS_PER_CHUNK * 2 + 1; i++) {
+            recs.add(Map.of("id", i));
+        }
+        WriteRecords task = baseBuilder().records(Property.of(recs)).build();
+
+        WriteRecords.Output output = task.run(runContext);
+        assertThat(output.getRecordsCount(), is((long) WriteRecords.MAX_RECORDS_PER_CHUNK * 2 + 1));
+        assertThat(chunkCount.get(), is(3));
+        assertThat(tokenRequestCount.get(), is(1)); // Because 3600 is > margin, no refresh
     }
 
 }
