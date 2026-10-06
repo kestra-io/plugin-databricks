@@ -461,10 +461,10 @@ public class Trigger extends AbstractTrigger
         var normalizedFilePath = normalizeDbfsDirectory(filePath);
 
         var relativePath;
-        if (`/`.equals(normalizedFrom)) {
+        if ("/".equals(normalizedFrom)) {
             relativePath = normalizedFilePath.substring(1);
         } else {
-            var prefix = normalizedFrom + `/`;
+            var prefix = normalizedFrom + "/";
             if (!normalizedFilePath.startsWith(prefix)) {
                 throw new IllegalArgumentException(
                     "Detected DBFS file is outside the watched `from` path: " + filePath
@@ -477,13 +477,13 @@ public class Trigger extends AbstractTrigger
             throw new IllegalArgumentException("Detected DBFS file path is empty: " + filePath);
         }
 
-        return `/`.equals(normalizedMoveDirectory)
-            ? `/` + relativePath
-            : normalizedMoveDirectory + `/` + relativePath;
+        return "/".equals(normalizedMoveDirectory)
+            ? "/" + relativePath
+            : normalizedMoveDirectory + "/" + relativePath;
     }
 
     private static String normalizeDbfsDirectory(String path) {
-        if (path.length() > 1 && path.endsWith(`/`)) {
+        if (path.length() > 1 && path.endsWith("/")) {
             return path.substring(0, path.length() - 1);
         }
         return path;
@@ -493,9 +493,9 @@ public class Trigger extends AbstractTrigger
         var normalizedRoot = normalizeDbfsDirectory(root);
         var normalizedCandidate = normalizeDbfsDirectory(candidate);
 
-        return `/`.equals(normalizedRoot)
+        return "/".equals(normalizedRoot)
             || normalizedCandidate.equals(normalizedRoot)
-            || normalizedCandidate.startsWith(normalizedRoot + `/`);
+            || normalizedCandidate.startsWith(normalizedRoot + "/");
     }
 
     protected Iterable<FileInfo> listDirectory(WorkspaceClient workspaceClient, String path) {
