@@ -300,7 +300,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             sendChunk(httpClient, url, tokenHolder.getToken(), chunk, catalog, schema, table, alreadyAccepted);
         } catch (HttpClientResponseException e) {
             int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
-            if (status == 401) {
+            if (status == 401 && !tokenHolder.isPat()) {
                 refreshOAuthToken(tokenHolder, runContext, host, workspaceId, catalog, schema, table);
                 try {
                     sendChunk(httpClient, url, tokenHolder.getToken(), chunk, catalog, schema, table, alreadyAccepted);
