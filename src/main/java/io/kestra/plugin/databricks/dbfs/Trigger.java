@@ -460,7 +460,7 @@ public class Trigger extends AbstractTrigger
         var normalizedMoveDirectory = normalizeDbfsDirectory(rMoveDirectory);
         var normalizedFilePath = normalizeDbfsDirectory(filePath);
 
-        var relativePath;
+        String relativePath;
         if ("/".equals(normalizedFrom)) {
             relativePath = normalizedFilePath.substring(1);
         } else {
