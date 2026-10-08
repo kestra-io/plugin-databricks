@@ -1,10 +1,7 @@
 package io.kestra.plugin.databricks.lakebase;
 
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
@@ -21,6 +18,7 @@ import io.kestra.core.models.property.Property;
 import io.kestra.core.models.tasks.RunnableTask;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -113,62 +111,73 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
         int placeholders = LakebaseService.placeholderCount(renderedSql);
         int chunk = runContext.render(batchSize).as(Integer.class).orElse(1000);
 
-        List<List<Object>> rows = new ArrayList<>();
-        rows.addAll(rowsFromParameterGroups(runContext, placeholders));
-        rows.addAll(rowsFromFile(runContext, placeholders));
-
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException("Batch requires parameterGroups or from with at least one row");
-        }
-
-        runContext.logger().debug("Starting Lakebase batch of {} row(s): {}", rows.size(), renderedSql);
-
-        long updated = 0L;
-        long queries = 0L;
+        Counters counters = new Counters();
+        List<List<Object>> buffer = new ArrayList<>(Math.max(chunk, 1));
 
         try (
             Connection connection = LakebaseService.connect(runContext, this);
             PreparedStatement stmt = connection.prepareStatement(renderedSql)
         ) {
-            int inBatch = 0;
-            for (List<Object> row : rows) {
-                bind(stmt, row, placeholders);
-                stmt.addBatch();
-                inBatch++;
-                if (inBatch >= chunk) {
-                    updated += sum(stmt.executeBatch());
-                    queries++;
-                    inBatch = 0;
-                }
+            streamParameterGroups(runContext, stmt, buffer, placeholders, chunk, counters);
+            streamFile(runContext, stmt, buffer, placeholders, chunk, counters);
+
+            if (counters.records == 0) {
+                throw new IllegalArgumentException("Batch requires parameterGroups or from with at least one row");
             }
-            if (inBatch > 0) {
-                updated += sum(stmt.executeBatch());
-                queries++;
+            if (!buffer.isEmpty()) {
+                counters.updated += flush(stmt, buffer, placeholders);
+                counters.queries++;
             }
         }
 
-        runContext.metric(Counter.of("records", rows.size()));
-        runContext.metric(Counter.of("updated", updated));
-        runContext.metric(Counter.of("query", queries));
+        runContext.logger().debug("Finished Lakebase batch of {} row(s): {}", counters.records, renderedSql);
+        runContext.metric(Counter.of("records", counters.records));
+        runContext.metric(Counter.of("updated", counters.updated));
+        runContext.metric(Counter.of("query", counters.queries));
 
         return Output.builder()
-            .rowCount((long) rows.size())
-            .updatedCount(updated)
+            .rowCount(counters.records)
+            .updatedCount(counters.updated)
             .build();
     }
 
-    private List<List<Object>> rowsFromParameterGroups(RunContext runContext, int placeholders) throws Exception {
-        List<ParameterGroup> groups = runContext.render(parameterGroups).asList(ParameterGroup.class);
-        if (groups.isEmpty()) {
-            return List.of();
+    private static void append(
+        PreparedStatement stmt,
+        List<List<Object>> buffer,
+        List<Object> row,
+        int placeholders,
+        int chunk,
+        Counters counters) throws Exception {
+        buffer.add(row);
+        counters.records++;
+        if (buffer.size() >= chunk) {
+            counters.updated += flush(stmt, buffer, placeholders);
+            counters.queries++;
         }
+    }
 
-        List<List<Object>> rows = new ArrayList<>();
-        for (ParameterGroup group : groups) {
-            Object rendered = renderParameters(runContext, group);
-            rows.addAll(LakebaseService.expandParameterGroup(rendered, placeholders));
+    private static long flush(PreparedStatement stmt, List<List<Object>> buffer, int placeholders) throws Exception {
+        for (List<Object> row : buffer) {
+            bind(stmt, row, placeholders);
+            stmt.addBatch();
         }
-        return rows;
+        long updated = sum(stmt.executeBatch());
+        buffer.clear();
+        return updated;
+    }
+
+    private void streamParameterGroups(
+        RunContext runContext,
+        PreparedStatement stmt,
+        List<List<Object>> buffer,
+        int placeholders,
+        int chunk,
+        Counters counters) throws Exception {
+        for (ParameterGroup group : runContext.render(parameterGroups).asList(ParameterGroup.class)) {
+            for (List<Object> row : LakebaseService.expandParameterGroup(renderParameters(runContext, group), placeholders)) {
+                append(stmt, buffer, row, placeholders, chunk, counters);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -203,26 +212,37 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
         return raw;
     }
 
-    private List<List<Object>> rowsFromFile(RunContext runContext, int placeholders) throws Exception {
+    private void streamFile(
+        RunContext runContext,
+        PreparedStatement stmt,
+        List<List<Object>> buffer,
+        int placeholders,
+        int chunk,
+        Counters counters) throws Exception {
         String fromValue = runContext.render(from).as(String.class).orElse(null);
         if (fromValue == null || fromValue.isBlank()) {
-            return List.of();
+            return;
         }
 
-        List<List<Object>> rows = new ArrayList<>();
-        try (
-            InputStream input = runContext.storage().getFile(URI.create(fromValue));
-            Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8)
-        ) {
-            List<Object> items = FileSerde.readAll(reader).collectList().block();
-            if (items == null) {
-                return List.of();
-            }
-            for (Object item : items) {
-                rows.addAll(LakebaseService.expandParameterGroup(normalizeFileRow(item), placeholders));
-            }
+        var failure = new java.util.concurrent.atomic.AtomicReference<Exception>();
+        try (InputStream input = runContext.storage().getFile(URI.create(fromValue))) {
+            FileSerde.read(input, item ->
+            {
+                if (failure.get() != null) {
+                    return;
+                }
+                try {
+                    for (List<Object> row : LakebaseService.expandParameterGroup(normalizeFileRow(item), placeholders)) {
+                        append(stmt, buffer, row, placeholders, chunk, counters);
+                    }
+                } catch (Exception e) {
+                    failure.set(e);
+                }
+            });
         }
-        return rows;
+        if (failure.get() != null) {
+            throw failure.get();
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -245,6 +265,12 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
         for (int i = 0; i < row.size(); i++) {
             stmt.setObject(i + 1, row.get(i));
         }
+    }
+
+    private static final class Counters {
+        private long records;
+        private long updated;
+        private long queries;
     }
 
     private static long sum(int[] counts) {

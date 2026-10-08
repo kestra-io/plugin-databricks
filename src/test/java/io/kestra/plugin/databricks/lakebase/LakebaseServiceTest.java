@@ -60,7 +60,8 @@ class LakebaseServiceTest {
         var session = LakebaseService.prepare(runContext(query()), query(), client);
 
         assertThat(mintCalls.get(), is(1));
-        assertThat(session.token(), is("fresh-token"));
+        assertThat(session.properties().getProperty("password"), is("fresh-token"));
+        assertThat(session.toString(), not(containsString("fresh-token")));
         assertThat(session.jdbcUrl(), is("jdbc:postgresql://ep-abc.database.cloud.databricks.com:5432/orders_db"));
         assertThat(session.properties().getProperty("user"), is(CLIENT_ID));
         assertThat(session.properties().getProperty("password"), is("fresh-token"));
@@ -211,7 +212,7 @@ class LakebaseServiceTest {
 
         assertThat(session.jdbcUrl(), not(containsString("super-secret-token")));
         assertThat(session.properties().getProperty("password"), is("super-secret-token"));
-        assertThat(session.token(), is("super-secret-token"));
+        assertThat(session.toString(), not(containsString("super-secret-token")));
         assertThat(session.properties().get("user"), not(nullValue()));
     }
 

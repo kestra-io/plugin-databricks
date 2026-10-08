@@ -20,6 +20,7 @@ import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.serializers.FileSerde;
+import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.IdUtils;
 import io.kestra.core.utils.TestsUtils;
 
@@ -115,6 +116,45 @@ class BatchTest {
 
         assertThat(output.getRowCount(), is(2L));
         assertThat(countRows(), is(2));
+    }
+
+    @Test
+    void exampleYamlInsertsOneRowPerInputInsteadOfTheJsonText() throws Exception {
+        var task = JacksonMapper.ofYaml().readValue("""
+            id: insert_rows
+            type: io.kestra.plugin.databricks.lakebase.Batch
+            workspaceHost: https://example.databricks.com
+            clientId: "00000000-0000-0000-0000-000000000001"
+            clientSecret: secret
+            endpoint: projects/p/branches/b/endpoints/e
+            database: orders_db
+            sql: "INSERT INTO orders_audit (payload) VALUES (?)"
+            parameterGroups:
+              - parameters: "{{ inputs.rows }}"
+            """, Batch.class);
+
+        var output = task.run(
+            TestsUtils.mockRunContext(
+                runContextFactory,
+                task,
+                Map.of("rows", List.of("a", "b", "c"))
+            )
+        );
+
+        assertThat(output.getRowCount(), is(3L));
+        assertThat(countRows(), is(3));
+        try (
+            Connection connection = DriverManager.getConnection(jdbcUrl, "sa", "");
+            Statement statement = connection.createStatement();
+            ResultSet rs = statement.executeQuery("SELECT payload FROM orders_audit ORDER BY payload")
+        ) {
+            assertThat(rs.next(), is(true));
+            assertThat(rs.getString(1), is("a"));
+            assertThat(rs.next(), is(true));
+            assertThat(rs.getString(1), is("b"));
+            assertThat(rs.next(), is(true));
+            assertThat(rs.getString(1), is("c"));
+        }
     }
 
     @Test

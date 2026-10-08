@@ -53,10 +53,15 @@ public final class LakebaseService {
         String resolveHost(String endpoint);
     }
 
-    public record Session(String jdbcUrl, Properties properties, String token) {
+    public record Session(String jdbcUrl, Properties properties) {
         public Connection connect() throws SQLException {
             registerDriver();
             return DriverManager.getConnection(jdbcUrl, properties);
+        }
+
+        @Override
+        public String toString() {
+            return "Session[jdbcUrl=" + jdbcUrl + "]";
         }
     }
 
@@ -103,7 +108,7 @@ public final class LakebaseService {
 
         runContext.logger().debug("Opening Lakebase JDBC connection to {} as user {}", jdbcUrl, clientId);
 
-        return new Session(jdbcUrl, properties, token);
+        return new Session(jdbcUrl, properties);
     }
 
     public static Client defaultClient(RunContext runContext, LakebaseConnectionInterface conn) throws IllegalVariableEvaluationException {

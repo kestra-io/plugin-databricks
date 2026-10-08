@@ -123,6 +123,20 @@ class QueryTest {
     }
 
     @Test
+    void postgresCastOperatorIsNotTreatedAsANamedParameter() throws Exception {
+        var task = baseQuery()
+            .sql(Property.ofValue("SELECT id::varchar AS id_text FROM orders WHERE status = :status"))
+            .parameters(Property.ofValue(Map.of("status", "pending")))
+            .fetchType(Property.ofValue(FetchType.FETCH_ONE))
+            .build();
+
+        var output = task.run(runContext(task));
+
+        assertThat(output.getSize(), is(1L));
+        assertThat(String.valueOf(output.getRow().get("ID_TEXT")), is("1"));
+    }
+
+    @Test
     void namedParametersAreBound() throws Exception {
         var task = baseQuery()
             .sql(Property.ofValue("SELECT id FROM orders WHERE status = :status"))
