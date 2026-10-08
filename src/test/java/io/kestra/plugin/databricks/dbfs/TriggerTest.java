@@ -268,7 +268,7 @@ class TriggerTest {
 
         trigger.maxFiles = Property.ofExpression("{{ 1001 }}");
         assertThrows(
-            IllegalArgumentException.class,
+            ConstraintViolationException.class,
             () -> trigger.evaluate(context.getKey(), context.getValue())
         );
     }
