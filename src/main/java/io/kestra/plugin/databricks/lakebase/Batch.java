@@ -187,7 +187,11 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
             return List.of();
         }
         if (raw instanceof String string) {
-            return runContext.render(string);
+            String rendered = runContext.render(string).trim();
+            if (rendered.startsWith("[")) {
+                return JacksonMapper.ofJson().readValue(rendered, List.class);
+            }
+            return rendered;
         }
         if (raw instanceof List<?> list) {
             List<Object> rendered = new ArrayList<>(list.size());
