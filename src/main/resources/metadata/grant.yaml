@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.unitycatalog.grant
+name: "grant"
+title: "Unity Catalog - Grants"
+description: "Tasks that read and update permissions on Databricks Unity Catalog securable objects."
+body: "Use these tasks to inspect and change Unity Catalog permissions. Set securableType (for example SCHEMA or VOLUME) and fullName, then pass a list of changes, each with a principal and the privileges to add or remove."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

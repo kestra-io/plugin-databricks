@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.unitycatalog.schema
+name: "schema"
+title: "Unity Catalog - Schemas"
+description: "Tasks that create, read, update, list and delete Databricks Unity Catalog schemas."
+body: "Use these tasks to provision and govern schemas, the second level of the Unity Catalog namespace. Create and List use catalogName; Get, Update and Delete address a schema by fullName in the form catalog.schema, and Delete accepts force to remove a non-empty schema."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"

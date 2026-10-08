@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.unitycatalog.table
+name: "table"
+title: "Unity Catalog - Tables"
+description: "Tasks and a trigger to list, read and delete Databricks Unity Catalog tables and react to new ones."
+body: "Use these tasks to inspect and clean up Unity Catalog tables by catalogName and schemaName or by fullName in the form catalog.schema.table. Tables are created with SQL, for example through the sql.Query task. The Trigger polls a schema and starts an execution when new tables appear."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
