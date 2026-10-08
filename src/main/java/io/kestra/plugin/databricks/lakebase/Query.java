@@ -219,6 +219,9 @@ public class Query extends AbstractLakebaseTask implements RunnableTask<Query.Ou
             } else if (c == '"' && !inSingle) {
                 inDouble = !inDouble;
                 rewritten.append(c);
+            } else if (c == ':' && !inSingle && !inDouble && i + 1 < preparedSql.length() && preparedSql.charAt(i + 1) == ':') {
+                rewritten.append("::");
+                i++;
             } else if (c == ':' && !inSingle && !inDouble && i + 1 < preparedSql.length() && Character.isJavaIdentifierStart(preparedSql.charAt(i + 1))) {
                 int start = i + 1;
                 int end = start;
