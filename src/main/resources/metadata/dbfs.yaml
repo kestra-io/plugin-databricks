@@ -2,7 +2,7 @@ group: io.kestra.plugin.databricks.dbfs
 name: "dbfs"
 title: "DBFS"
 description: "Tasks that move files between Kestra and the Databricks File System (DBFS)."
-body: "Use these tasks to upload or download artifacts for your pipelines through DBFS using your Databricks host and token. Specify the source file from Kestra storage via `from` and the DBFS destination via `to`; downloads return a Kestra storage URI so the file can be reused downstream."
+body: "Use these tasks to upload or download artifacts for your pipelines through DBFS using your Databricks host and token. Specify the source file from Kestra storage via `from` and the DBFS destination via `to`; downloads return a Kestra storage URI so the file can be reused downstream. Databricks considers DBFS legacy; for new flows, use the Unity Catalog volume tasks (io.kestra.plugin.databricks.unitycatalog.volume) instead."
 videos: []
 createdBy: "Kestra Core Team"
 managedBy: "Kestra Core Team"

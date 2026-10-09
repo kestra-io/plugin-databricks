@@ -1,6 +1,6 @@
 # How to use the Databricks plugin
 
-Run jobs, manage clusters, execute SQL, ask Genie, and move files on Databricks from Kestra flows.
+Run jobs, manage clusters, execute SQL, ask Genie, govern Unity Catalog, and move files on Databricks from Kestra flows.
 
 ## Authentication
 
@@ -16,8 +16,38 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 
 `sql.Query` runs a SQL query against a Databricks SQL warehouse — set `host`, `httpPath`, `accessToken`, and `sql`. Optionally scope to a `catalog` and `schema`. Results are streamed to internal storage.
 
-`dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path.
+`dbfs.Upload` uploads a file from Kestra internal storage to DBFS — set `from` (a `kestra://` URI) and `to` (the DBFS destination path). `dbfs.Download` retrieves a file from DBFS by `from` path. Note: Databricks considers DBFS legacy per [official guidance](https://docs.databricks.com/aws/en/dbfs/unity-catalog); for new flows, use Unity Catalog Volumes tasks (`unitycatalog.volume.Upload` and `unitycatalog.volume.Download`) instead.
+
+### DBFS trigger
+
+Note: Databricks considers DBFS legacy per [official guidance](https://docs.databricks.com/aws/en/dbfs/unity-catalog); for new flows, store files in Unity Catalog Volumes instead (there is no file trigger for Volumes yet).
+
+`dbfs.Trigger` polls an absolute DBFS directory at a fixed `interval` (default `PT1M`) and starts an execution when files are detected according to `on`, which defaults to `CREATE_OR_UPDATE`. Set `recursive: true` to watch nested partition directories. Because recursive listings are materialized on each poll, keep watched trees to a few thousand files.
+
+The trigger persists file state in the namespace KV Store using `stateKey` (defaulting to a stable per-trigger key), with optional `stateTtl`. On the first poll, existing matching files are reported as `CREATE` events.
+
+Use `regExp` to filter matching DBFS paths. `maxFiles` limits each execution to 1–1000 detected files (default `25`); remaining files stay eligible for later polls.
+
+The trigger output exposes `trigger.files` and `trigger.size`. Each entry in `trigger.files` has exactly these keys: `path`, `fileSize`, `modificationTime`, `isDir` and `changeType` (`CREATE` or `UPDATE`).
+
+The optional `action` runs after the trigger state is persisted:
+- `NONE` leaves detected files in place.
+- `MOVE` moves each detected file under `moveDirectory`, preserving its path relative to `from`.
+- `DELETE` removes each detected file from DBFS.
+
+`MOVE` requires an absolute `moveDirectory`. When `recursive: true`, the destination must be outside the watched `from` path to avoid detecting moved files again. Failed MOVE or DELETE operations are logged per file; the trigger still emits the detected batch, and the failed file remains in the source until it changes.
+
 
 `cli.DatabricksCLI` runs Databricks CLI commands in a container — set `commands` (the `host` and authentication are passed to the CLI via environment variables). `cli.DatabricksSQLCLI` runs SQL statements through the Databricks SQL CLI — set `commands` along with the connection properties, and use `outputFiles` to persist the CLI output.
 
 `genie.AskQuestion` asks a question of an existing Genie space — set `spaceId` and `question`. It blocks until Genie answers; `timeout` is an ISO-8601 duration (default 20 minutes) and must be greater than zero. `genie.Continue` sends a follow-up — set `conversationId` from the previous task. The space has to exist first. A text answer is returned on `text`. Generated SQL is returned on `query` with rows on `result`; a text-only answer leaves those unset. At most `maxRows` rows are returned (default 1000); a larger result fails and names `maxRows` and the row count.
+
+## Unity Catalog
+
+The `unitycatalog` tasks manage the Unity Catalog governance layer with the same `host` and `authentication` properties as every other task. Objects follow the three-level namespace `catalog.schema.table|volume`: creation and listing tasks take the parent parts (`catalogName`, `schemaName`) and a `name`, while `Get`, `Update` and `Delete` address a single object by `fullName` (`catalog.schema`, `catalog.schema.volume`, ...). Catalogs are addressed by `name`.
+
+`unitycatalog.catalog` and `unitycatalog.schema` provide `Create`, `List`, `Get`, `Update` and `Delete`; set `force` on `Delete` to remove a non-empty object. `unitycatalog.table` provides `List`, `Get` and `Delete` only — tables are created with SQL, for example through `sql.Query`. `unitycatalog.table.Trigger` polls a schema every `interval` (default `PT5M`) and starts one execution for the tables discovered since the previous poll, exposed as `trigger.tables`, `trigger.fullNames` and `trigger.size`; known tables are persisted in the namespace KV Store, so with the default `on: CREATE` the first poll reports every existing table.
+
+`unitycatalog.volume` provides `Create` (`MANAGED` by default; `EXTERNAL` requires `storageLocation`), `List`, `Get`, `Update` and `Delete` for volume metadata, plus `Upload` and `Download` for file content through the Databricks Files API, the replacement for the legacy DBFS tasks. Both take a `volumePath` in the form `/Volumes/<catalog>/<schema>/<volume>/<path>` and the volume must already exist; `Upload` reads `from` (a `kestra://` URI) and fails on an existing file unless `overwrite` is `true`, `Download` returns a storage `uri`.
+
+`unitycatalog.grant.Get` returns the privileges granted directly on an object, set `securableType` (for example `SCHEMA`) and `fullName`, and optionally `principal`. `unitycatalog.grant.Update` applies a list of `changes`, each with a `principal` and the privileges to `add` or `remove`.
