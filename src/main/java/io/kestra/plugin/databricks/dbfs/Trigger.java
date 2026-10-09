@@ -17,7 +17,6 @@ import com.databricks.sdk.service.files.Delete;
 import com.databricks.sdk.service.files.FileInfo;
 import com.databricks.sdk.service.files.Move;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Plugin;
@@ -39,8 +38,6 @@ import io.kestra.plugin.databricks.DatabricksConnectionInterface;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -56,13 +53,14 @@ import lombok.experimental.SuperBuilder;
 @Getter
 @NoArgsConstructor
 @Schema(
-    title = "Trigger on new DBFS files",
+    title = "Trigger on new DBFS files (Legacy)",
     description = """
         Periodically lists a DBFS path and starts one execution for files detected since the previous poll.
         Directories are ignored as trigger events. The trigger persists file state in Kestra's namespace KV store
         to avoid duplicate events. The first poll reports existing matching files as CREATE events; the default
         `on` mode is CREATE_OR_UPDATE. Recursive traversal uses explicit visited-directory tracking, while listings
         are materialized during each poll; keep recursively watched trees to a few thousand files to avoid excessive memory usage.
+        Note: Databricks considers DBFS legacy; for new flows, store files in Unity Catalog Volumes instead.
         """
 )
 @Plugin(
@@ -202,7 +200,7 @@ public class Trigger extends AbstractTrigger
     )
     @Builder.Default
     @PluginProperty(group = "execution")
-    protected Property<@Min(1) @Max(1000) Integer> maxFiles = Property.ofValue(25);
+    protected Property<Integer> maxFiles = Property.ofValue(25);
 
 
     @Schema(
@@ -251,6 +249,27 @@ public class Trigger extends AbstractTrigger
                 PebbleUtil.containsOpeningBlockDelimiter(moveDirectory.toString())
                     || !moveDirectory.toString().isBlank()
             );
+    }
+
+    @AssertTrue(message = "maxFiles must be between 1 and 1000")
+    @JsonIgnore
+    public boolean isMaxFilesValid() {
+        if (maxFiles == null) {
+            return true;
+        }
+
+        var expr = maxFiles.toString();
+
+        if (PebbleUtil.containsOpeningBlockDelimiter(expr)) {
+            return true;
+        }
+
+        try {
+            var value = Integer.parseInt(expr.trim());
+            return value >= 1 && value <= 1000;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     @Override
@@ -342,7 +361,10 @@ public class Trigger extends AbstractTrigger
             if (change.fire()) {
                 detected.add(
                     TriggeredFile.builder()
-                        .file(file)
+                        .path(file.getPath())
+                        .fileSize(file.getFileSize())
+                        .modificationTime(file.getModificationTime())
+                        .isDir(file.getIsDir())
                         .changeType(change.isNew() ? ChangeType.CREATE : ChangeType.UPDATE)
                         .build()
                 );
@@ -419,7 +441,7 @@ public class Trigger extends AbstractTrigger
         }
 
         for (var triggeredFile : files) {
-            var filePath = triggeredFile.getFile().getPath();
+            var filePath = triggeredFile.getPath();
 
             try {
                 performSingleAction(workspaceClient, triggeredFile, rAction, rMoveDirectory, rFrom);
@@ -442,7 +464,7 @@ public class Trigger extends AbstractTrigger
         String rMoveDirectory,
         String rFrom
     ) {
-        var filePath = triggeredFile.getFile().getPath();
+        var filePath = triggeredFile.getPath();
 
         switch (rAction) {
             case MOVE -> workspaceClient.dbfs().move(
@@ -511,12 +533,17 @@ public class Trigger extends AbstractTrigger
     @AllArgsConstructor
     @Builder
     public static class TriggeredFile {
-        @Schema(
-            title = "DBFS file metadata",
-            description = "Unwrapped DBFS metadata including path, fileSize, modificationTime, and isDir."
-        )
-        @JsonUnwrapped
-        private final FileInfo file;
+        @Schema(title = "DBFS file path")
+        private final String path;
+
+        @Schema(title = "File size in bytes")
+        private final Long fileSize;
+
+        @Schema(title = "Last modification time, in epoch milliseconds")
+        private final Long modificationTime;
+
+        @Schema(title = "Whether the entry is a directory")
+        private final Boolean isDir;
 
         @Schema(title = "Detected change type: CREATE for a newly observed file or UPDATE for changed metadata")
         private final ChangeType changeType;

@@ -2,6 +2,8 @@ package io.kestra.plugin.databricks.dbfs;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,8 +32,12 @@ import com.databricks.sdk.service.files.Move;
 
 import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.executions.Execution;
+import io.kestra.core.models.flows.Flow;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.models.triggers.StatefulTriggerInterface;
+import io.kestra.core.models.validations.ModelValidator;
+import io.kestra.core.serializers.JacksonMapper;
+import io.kestra.core.serializers.YamlParser;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.IdUtils;
@@ -49,6 +55,9 @@ class TriggerTest {
 
     @Inject
     private Validator validator;
+
+    @Inject
+    private ModelValidator modelValidator;
 
     @Test
     void usesDefaultStateKeyWhenUnset() throws Exception {
@@ -288,20 +297,66 @@ class TriggerTest {
     }
 
     @Test
-    void maxFilesHonorsDeclaredBounds() {
-        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+    void maxFilesOutsideBoundsFailsFlowValidation() {
+        for (var value : List.of("0", "1001")) {
+            var validation = modelValidator.isValid(flowWithMaxFiles(value));
 
-        for (var value : List.of(0, 1001)) {
-            trigger.maxFiles = Property.ofValue(value);
-
-            var violations = validator.validate(trigger);
-
-            assertThat(
-                violations.stream()
-                    .anyMatch(v -> v.getPropertyPath().toString().equals("maxFiles")),
-                is(true)
-            );
+            assertThat(validation.isPresent(), is(true));
+            assertThat(validation.get().getMessage(), containsString("maxFiles must be between 1 and 1000"));
         }
+    }
+
+    @Test
+    void maxFilesWithinBoundsOrTemplatedPassesFlowValidation() {
+        for (var value : List.of("25", "1", "1000", "\"{{ inputs.n }}\"")) {
+            assertThat(modelValidator.isValid(flowWithMaxFiles(value)).isPresent(), is(false));
+        }
+    }
+
+    @Test
+    void triggeredFileIsSerializedWithCamelCaseKeys() throws Exception {
+        var trigger = new MockTrigger(List.of(file("/mnt/incoming/a.csv", 10L, 100L)));
+        var context = TestsUtils.mockTrigger(runContextFactory, trigger);
+
+        var execution = trigger.evaluate(context.getKey(), context.getValue()).orElseThrow();
+        var output = Trigger.Output.builder()
+            .files(List.of(Trigger.TriggeredFile.builder()
+                .path("/mnt/incoming/a.csv")
+                .fileSize(10L)
+                .modificationTime(100L)
+                .isDir(false)
+                .changeType(Trigger.ChangeType.CREATE)
+                .build()))
+            .size(1)
+            .build();
+
+        @SuppressWarnings("unchecked")
+        var serialized = ((List<Map<String, Object>>) JacksonMapper.toMap(output).get("files")).getFirst();
+        assertThat(serialized.keySet(), containsInAnyOrder("path", "fileSize", "modificationTime", "isDir", "changeType"));
+
+        @SuppressWarnings("unchecked")
+        var variables = ((List<Map<String, Object>>) execution.getTrigger().getVariables().get("files")).getFirst();
+        assertThat(variables.keySet(), containsInAnyOrder("path", "fileSize", "modificationTime", "isDir", "changeType"));
+        assertThat(variables.get("fileSize"), is(10L));
+    }
+
+    private static Flow flowWithMaxFiles(String maxFiles) {
+        return YamlParser.parse("""
+            id: dbfs_trigger_validation
+            namespace: company.team
+
+            tasks:
+              - id: hello
+                type: io.kestra.plugin.core.log.Log
+                message: hello
+
+            triggers:
+              - id: watch_dbfs
+                type: io.kestra.plugin.databricks.dbfs.Trigger
+                host: https://example.cloud.databricks.com
+                from: /mnt/incoming
+                maxFiles: %s
+            """.formatted(maxFiles), Flow.class);
     }
 
     @Test
@@ -586,7 +641,7 @@ class TriggerTest {
             String moveDirectory,
             String from
         ) {
-            var filePath = triggeredFile.getFile().getPath();
+            var filePath = triggeredFile.getPath();
             performedAction = action;
             actedPaths.add(filePath);
 

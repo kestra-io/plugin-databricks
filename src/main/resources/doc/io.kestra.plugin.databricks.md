@@ -20,13 +20,15 @@ Set `host` to your Databricks workspace URL and configure `authentication` with 
 
 ### DBFS trigger
 
+Note: Databricks considers DBFS legacy per [official guidance](https://docs.databricks.com/aws/en/dbfs/unity-catalog); for new flows, store files in Unity Catalog Volumes instead (there is no file trigger for Volumes yet).
+
 `dbfs.Trigger` polls an absolute DBFS directory at a fixed `interval` (default `PT1M`) and starts an execution when files are detected according to `on`, which defaults to `CREATE_OR_UPDATE`. Set `recursive: true` to watch nested partition directories. Because recursive listings are materialized on each poll, keep watched trees to a few thousand files.
 
 The trigger persists file state in the namespace KV Store using `stateKey` (defaulting to a stable per-trigger key), with optional `stateTtl`. On the first poll, existing matching files are reported as `CREATE` events.
 
 Use `regExp` to filter matching DBFS paths. `maxFiles` limits each execution to 1–1000 detected files (default `25`); remaining files stay eligible for later polls.
 
-The trigger output exposes `trigger.files` and `trigger.size`. Each entry in `trigger.files` contains the DBFS file metadata (`path`, `fileSize`, `modificationTime`, `isDir`) plus `changeType` (`CREATE` or `UPDATE`).
+The trigger output exposes `trigger.files` and `trigger.size`. Each entry in `trigger.files` has exactly these keys: `path`, `fileSize`, `modificationTime`, `isDir` and `changeType` (`CREATE` or `UPDATE`).
 
 The optional `action` runs after the trigger state is persisted:
 - `NONE` leaves detected files in place.
