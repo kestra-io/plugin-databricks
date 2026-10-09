@@ -4,6 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -233,6 +236,20 @@ public final class LakebaseService {
             return rows;
         }
         return List.of(new ArrayList<>(list));
+    }
+
+    /**
+     * pgjdbc {@code PreparedStatement.setObject} cannot infer a SQL type for {@link ZonedDateTime}
+     * or {@link Instant}. Query STORE writes {@code timestamptz} as {@code ZonedDateTime}.
+     */
+    static Object jdbcBindValue(Object value) {
+        if (value instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.toOffsetDateTime();
+        }
+        if (value instanceof Instant instant) {
+            return instant.atOffset(ZoneOffset.UTC);
+        }
+        return value;
     }
 
     static int placeholderCount(String sql) {

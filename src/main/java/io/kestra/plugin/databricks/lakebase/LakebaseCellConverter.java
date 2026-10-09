@@ -10,6 +10,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -35,7 +36,12 @@ final class LakebaseCellConverter {
             return time.toLocalTime();
         }
         if (data instanceof Timestamp timestamp) {
-            return timestamp.toInstant().atZone(zoneId);
+            // timestamptz is an instant. timestamp without time zone is a wall clock, and binding
+            // it as an OffsetDateTime makes Postgres shift it by the session time zone.
+            if (isTimestampWithTimeZone(rs.getMetaData().getColumnTypeName(columnIndex))) {
+                return timestamp.toInstant().atZone(zoneId);
+            }
+            return timestamp.toLocalDateTime();
         }
         if (data instanceof UUID uuid) {
             return uuid.toString();
@@ -65,5 +71,13 @@ final class LakebaseCellConverter {
         }
 
         return data;
+    }
+
+    private static boolean isTimestampWithTimeZone(String columnType) {
+        if (columnType == null) {
+            return false;
+        }
+        String normalized = columnType.toLowerCase(Locale.ROOT);
+        return "timestamptz".equals(normalized) || normalized.contains("with time zone");
     }
 }

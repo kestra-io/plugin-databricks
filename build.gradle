@@ -95,6 +95,7 @@ dependencies {
     testImplementation "org.hamcrest:hamcrest-library"
     testImplementation group: "io.kestra", name: "script", version: kestraVersion
     testImplementation "com.h2database:h2"
+    // Not managed by io.kestra:platform (testRuntimeClasspath has no constraint), so the pin stays.
     testImplementation "org.testcontainers:junit-jupiter:1.21.3"
     testImplementation "org.testcontainers:postgresql:1.21.3"
 }

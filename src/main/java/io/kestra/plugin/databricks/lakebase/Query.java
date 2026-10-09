@@ -238,7 +238,7 @@ public class Query extends AbstractLakebaseTask implements RunnableTask<Query.Ou
 
         PreparedStatement stmt = connection.prepareStatement(rewritten.toString(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         for (int i = 0; i < names.size(); i++) {
-            stmt.setObject(i + 1, namedParams.get(names.get(i)));
+            stmt.setObject(i + 1, LakebaseService.jdbcBindValue(namedParams.get(names.get(i))));
         }
         return stmt;
     }

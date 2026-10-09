@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import io.kestra.core.models.annotations.Example;
 import io.kestra.core.models.annotations.Metric;
@@ -224,7 +225,7 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
             return;
         }
 
-        var failure = new java.util.concurrent.atomic.AtomicReference<Exception>();
+        var failure = new AtomicReference<Exception>();
         try (InputStream input = runContext.storage().getFile(URI.create(fromValue))) {
             FileSerde.read(input, item ->
             {
@@ -263,7 +264,7 @@ public class Batch extends AbstractLakebaseTask implements RunnableTask<Batch.Ou
             );
         }
         for (int i = 0; i < row.size(); i++) {
-            stmt.setObject(i + 1, row.get(i));
+            stmt.setObject(i + 1, LakebaseService.jdbcBindValue(row.get(i)));
         }
     }
 
