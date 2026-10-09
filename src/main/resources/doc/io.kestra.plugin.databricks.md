@@ -51,3 +51,13 @@ The `unitycatalog` tasks manage the Unity Catalog governance layer with the same
 `unitycatalog.volume` provides `Create` (`MANAGED` by default; `EXTERNAL` requires `storageLocation`), `List`, `Get`, `Update` and `Delete` for volume metadata, plus `Upload` and `Download` for file content through the Databricks Files API, the replacement for the legacy DBFS tasks. Both take a `volumePath` in the form `/Volumes/<catalog>/<schema>/<volume>/<path>` and the volume must already exist; `Upload` reads `from` (a `kestra://` URI) and fails on an existing file unless `overwrite` is `true`, `Download` returns a storage `uri`.
 
 `unitycatalog.grant.Get` returns the privileges granted directly on an object, set `securableType` (for example `SCHEMA`) and `fullName`, and optionally `principal`. `unitycatalog.grant.Update` applies a list of `changes`, each with a `principal` and the privileges to `add` or `remove`.
+
+## Lakebase
+
+Lakebase is Databricks' managed Postgres (OLTP). It speaks the standard Postgres wire protocol, but it does not use the `host` + `authentication` block shared by the other tasks in this plugin. `lakebase.Query`, `lakebase.Batch`, and `lakebase.Trigger` authenticate with flat OAuth M2M properties: `workspaceHost`, `clientId`, `clientSecret`, and `endpoint` (`projects/<project-id>/branches/<branch-id>/endpoints/<endpoint-id>`).
+
+Each run calls `WorkspaceClient.postgres().generateDatabaseCredential` and opens its own JDBC connection. The service principal client ID is the Postgres username, and the minted token is the password. Tokens expire after about 60 minutes, so they are not pooled and must not be pasted into `plugin-jdbc-postgres` as a static password. SSL is on by default (`sslMode: REQUIRE`).
+
+Set `database` to the Postgres database name. `host` is optional: when it is omitted, the Postgres hostname is resolved from the endpoint (`status.hosts.host`). `port` defaults to `5432`. The service principal needs Workspace access and a matching Postgres OAuth role.
+
+`lakebase.Query` runs one statement. `fetchType` is `FETCH` (default), `FETCH_ONE`, `STORE`, or `NONE`. `lakebase.Batch` runs a prepared statement once per row from `parameterGroups` or from an Ion file (`from`). `lakebase.Trigger` polls on `interval` (default `PT1M`) and fires when the query returns at least one row.
