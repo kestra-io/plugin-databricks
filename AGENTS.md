@@ -27,6 +27,7 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 - `io.kestra.plugin.databricks.cluster.DeleteCluster`
 - `io.kestra.plugin.databricks.dbfs.Download`
 - `io.kestra.plugin.databricks.dbfs.Upload`
+- `io.kestra.plugin.databricks.dbfs.Trigger`
 - `io.kestra.plugin.databricks.genie.AskQuestion`
 - `io.kestra.plugin.databricks.genie.Continue`
 - `io.kestra.plugin.databricks.job.CreateJob`
