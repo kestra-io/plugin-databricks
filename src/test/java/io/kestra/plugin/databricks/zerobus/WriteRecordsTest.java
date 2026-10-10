@@ -217,8 +217,66 @@ class WriteRecordsTest {
         assertThat(receivedRecords.size(), is(2));
         assertThat(receivedRecords.get(0).get("temp"), is(22.5));
         assertThat(receivedRecords.get(0).get("active"), is(true));
-        assertThat(receivedRecords.get(0).get("time").toString(), containsString("2024-01-01"));
+        assertThat(receivedRecords.get(0).get("time"), is("2024-01-01T00:00:00.000Z"));
+    }
 
+    @Test
+    void inlineListNullElementThrowsException() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        
+        List<Map<String, Object>> recordsWithNull = new ArrayList<>();
+        recordsWithNull.add(Map.of("id", 1));
+        recordsWithNull.add(null);
+        recordsWithNull.add(Map.of("id", 3));
+        
+        WriteRecords task = baseBuilder()
+            .records(Property.of(recordsWithNull))
+            .build();
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(e.getMessage(), is("Record 2 is not an object."));
+    }
+
+    @Test
+    void ionFileReadsRecordsTextAndBinary() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+
+        File textFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(textFile)) {
+            fos.write("{id:1, name:\"test1\", temp:22.5, active:true, time:2024-01-01T00:00:00Z, empty:null}\n{id:2, name:\"test2\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        URI textUri = runContext.storage().putFile(textFile);
+
+        WriteRecords textTask = baseBuilder().from(Property.of(textUri.toString())).build();
+        textTask.run(runContext);
+        List<Map<String, Object>> textReceived = new ArrayList<>(receivedRecords);
+        receivedRecords.clear();
+
+        // Generated with ion-java 1.12.1 IonBinaryWriterBuilder: {id:1, name:"test1", temp:22.5, active:true, time:2024-01-01T00:00:00Z, empty:null} and {id:2, name:"test2"}
+        String hex = "E00100EAEEA18183DE9D87BE9A8269648474656D70866163746976658474696D6585656D707479DE9D8A2101848574657374318B53C100E18C118D68800FE881818080808E0FDA8A210284857465737432";
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        assertThat("First four bytes must be binary Ion magic number", bytes[0] == (byte) 0xE0 && bytes[1] == 0x01 && bytes[2] == 0x00 && bytes[3] == (byte) 0xEA, is(true));
+
+        File binFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(binFile)) {
+            fos.write(bytes);
+        }
+        URI binUri = runContext.storage().putFile(binFile);
+
+        WriteRecords binTask = baseBuilder().from(Property.of(binUri.toString())).build();
+        binTask.run(runContext);
+        List<Map<String, Object>> binReceived = new ArrayList<>(receivedRecords);
+        receivedRecords.clear();
+
+        assertThat(textReceived, is(binReceived));
+        assertThat(textReceived.size(), is(2));
+        assertThat(textReceived.get(0).get("temp"), is(22.5));
+        assertThat(textReceived.get(0).get("active"), is(true));
+        assertThat(textReceived.get(0).get("time"), is("2024-01-01T00:00:00Z"));
+        assertThat(binReceived.get(0).get("time"), is("2024-01-01T00:00:00Z"));
     }
 
     @Test
@@ -705,7 +763,6 @@ class WriteRecordsTest {
             .build();
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> task.run(TestsUtils.mockRunContext(runContextFactory, task, null)));
-        System.out.println("EXCEPTION: " + e.getMessage());
         e.printStackTrace();
         assertTrue(e.getMessage().contains("Other authentication types are not supported"));
     }
@@ -741,71 +798,76 @@ class WriteRecordsTest {
             .build();
 
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(TestsUtils.mockRunContext(runContextFactory, task, null)));
-        System.out.println("EXCEPTION: " + e.getMessage());
         e.printStackTrace();
         assertTrue(e.getMessage().contains("access_token in response is not a string"));
     }
 
     @Test
-    void invalidFileLineThrowsException() throws Exception {
-        File tempFile = File.createTempFile("invalid_lines", ".jsonl");
-        tempFile.deleteOnExit();
-        try (java.io.PrintWriter out = new java.io.PrintWriter(tempFile)) {
-            out.println("{\"a\": 1}");
-            out.println("not a valid json");
+    void severalRecordsOnOneLine() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.FileWriter writer = new java.io.FileWriter(tempFile)) {
+            writer.write("{\"id\":1} {\"id\":2}\n\n{\"id\":3}");
         }
+        URI uri = runContext.storage().putFile(tempFile);
 
-        RunContext uploadContext = TestsUtils.mockRunContext(runContextFactory, WriteRecords.builder().id("dummy").type(WriteRecords.class.getName()).build(), null);
-        URI fromUri = uploadContext.storage().putFile(tempFile);
-
-        WriteRecords task = WriteRecords.builder()
-            .id("test")
-            .type(WriteRecords.class.getName())
-            .workspaceId(Property.of("workspace"))
-            .endpoint(Property.of(endpoint))
-            .authentication(AuthenticationConfig.builder().token(Property.of("mock-token")).build())
-            .catalog(Property.of("my_cat"))
-            .schema(Property.of("my_schema"))
-            .table(Property.of("my_table"))
-            .region(Property.of("us-east-1"))
-            .from(Property.of(fromUri.toString()))
+        WriteRecords task = baseBuilder()
+            .from(Property.of(uri.toString()))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, null);
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
-        assertTrue(e.getMessage().contains("Failed to parse record at line 2"), e.getMessage());
+        WriteRecords.Output output = task.run(runContext);
+
+        assertThat(output.getRecordsCount(), is(3L));
+        assertThat(receivedRecords.size(), is(3));
     }
 
     @Test
-    void invalidFileLineWithBlankLineThrowsException() throws Exception {
-        File tempFile = File.createTempFile("invalid_lines_blank", ".jsonl");
-        tempFile.deleteOnExit();
+    void nonObjectRecordThrowsException() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), null);
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
         try (java.io.PrintWriter out = new java.io.PrintWriter(tempFile)) {
-            out.println("{\"a\": 1}");
-            out.println("   "); // blank line
-            out.println("{\"b\": 2}");
-            out.println("not a valid json");
+            out.print("{\"a\": 1} \"not an object\"");
         }
+        URI fromUri = runContext.storage().putFile(tempFile);
 
-        RunContext uploadContext = TestsUtils.mockRunContext(runContextFactory, WriteRecords.builder().id("dummy").type(WriteRecords.class.getName()).build(), null);
-        URI fromUri = uploadContext.storage().putFile(tempFile);
-
-        WriteRecords task = WriteRecords.builder()
-            .id("test")
-            .type(WriteRecords.class.getName())
-            .workspaceId(Property.of("workspace"))
-            .endpoint(Property.of(endpoint))
-            .authentication(AuthenticationConfig.builder().token(Property.of("mock-token")).build())
-            .catalog(Property.of("my_cat"))
-            .schema(Property.of("my_schema"))
-            .table(Property.of("my_table"))
-            .region(Property.of("us-east-1"))
+        WriteRecords task = baseBuilder()
             .from(Property.of(fromUri.toString()))
             .build();
 
-        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, task, null);
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
-        assertTrue(e.getMessage().contains("Failed to parse record at line 4"), e.getMessage());
+        assertTrue(e.getMessage().contains("Record 2 is not an object."), e.getMessage());
+
+        // Test with null
+        File tempFile2 = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.PrintWriter out = new java.io.PrintWriter(tempFile2)) {
+            out.print("{\"a\": 1} null");
+        }
+        URI fromUri2 = runContext.storage().putFile(tempFile2);
+
+        WriteRecords task2 = baseBuilder()
+            .from(Property.of(fromUri2.toString()))
+            .build();
+
+        IllegalStateException e2 = assertThrows(IllegalStateException.class, () -> task2.run(runContext));
+        assertTrue(e2.getMessage().contains("Record 2 is not an object."), e2.getMessage());
+    }
+
+    @Test
+    void malformedRecordThrowsException() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), null);
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.PrintWriter out = new java.io.PrintWriter(tempFile)) {
+            out.print("{\"a\": 1}\n{not valid}");
+        }
+        URI fromUri = runContext.storage().putFile(tempFile);
+
+        WriteRecords task = baseBuilder()
+            .from(Property.of(fromUri.toString()))
+            .build();
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertTrue(e.getMessage().contains("Failed to parse record 2"), e.getMessage());
     }
 
     @Test

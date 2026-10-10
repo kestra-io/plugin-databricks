@@ -1,7 +1,6 @@
 package io.kestra.plugin.databricks.zerobus;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpHeaders;
@@ -13,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.MappingIterator;
 
 import io.kestra.core.http.HttpRequest;
 import io.kestra.core.http.HttpResponse;
@@ -208,46 +208,52 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 ? (List) runContext.render(this.records).asList(Map.class)
                 : null;
 
-            BufferedReader reader = null;
+            InputStream inputStream = null;
+            MappingIterator<Map<String, Object>> iterator = null;
             if (!hasRecords) {
                 String fromUri = runContext.render(this.from).as(String.class)
                     .orElseThrow(() -> new IllegalArgumentException("from must be provided"));
-                reader = new BufferedReader(
-                    new InputStreamReader(
-                        runContext.storage().getFile(URI.create(fromUri)),
-                        StandardCharsets.UTF_8
-                    )
-                );
+                inputStream = runContext.storage().getFile(URI.create(fromUri));
+                iterator = JacksonMapper.ofIon().readerFor(new TypeReference<Map<String, Object>>() {}).readValues(inputStream);
             }
 
             try {
                 int inlineIndex = 0;
-                int physicalLineCount = 0;
+                int recordOrdinal = 0;
                 while (true) {
                     Map<String, Object> record = null;
                     if (hasRecords) {
                         if (inlineIndex < recordsList.size()) {
-                            record = recordsList.get(inlineIndex++);
+                            recordOrdinal++;
+                            Map<String, Object> listElement = recordsList.get(inlineIndex++);
+                            if (listElement == null) {
+                                throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
+                            }
+                            record = listElement;
                         }
                     } else {
-                        String line;
-                        while ((line = reader.readLine()) != null) {
-                            physicalLineCount++;
-                            if (!line.isBlank()) {
-                                break;
-                            }
+                        recordOrdinal++;
+                        boolean hasNext = false;
+                        try {
+                            hasNext = iterator.hasNextValue();
+                        } catch (Exception e) {
+                            throw new IllegalStateException("Failed to parse record " + recordOrdinal + ": " + e.getMessage(), e);
                         }
-                        if (line != null) {
+                        if (hasNext) {
+                            Map<String, Object> mapObj;
                             try {
-                                record = JacksonMapper.ofIon().readValue(line, new TypeReference<>() {
-                                });
+                                mapObj = iterator.nextValue();
+                            } catch (com.fasterxml.jackson.databind.exc.MismatchedInputException e) {
+                                throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
                             } catch (Exception e) {
-                                throw new IllegalStateException(
-                                    "Failed to parse record at line " + physicalLineCount + ": " + e.getMessage(),
-                                    e
-                                );
+                                throw new IllegalStateException("Failed to parse record " + recordOrdinal + ": " + e.getMessage(), e);
                             }
-                            inlineIndex++;
+                            if (mapObj == null) {
+                                throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
+                            }
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> castedRecord = (Map<String, Object>) convertIonValues(mapObj);
+                            record = castedRecord;
                         }
                     }
 
@@ -282,8 +288,11 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                     );
                 }
             } finally {
-                if (reader != null) {
-                    reader.close();
+                if (iterator != null) {
+                    iterator.close();
+                }
+                if (inputStream != null) {
+                    inputStream.close();
                 }
             }
         } finally {
@@ -374,8 +383,8 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private void refreshOAuthToken(TokenHolder tokenHolder, RunContext runContext, String host, String workspaceId,
         String catalog, String schema, String table) throws Exception {
-        String clientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow();
-        String clientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow();
+        String clientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
+        String clientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
         OAuthToken refreshed = fetchOAuthToken(
             runContext, host, workspaceId, clientId, clientSecret, catalog, schema, table
         );
@@ -422,10 +431,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             return new TokenHolder(token, true, 0);
         }
 
-        String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow();
+        String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
         String clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
-            .orElseThrow();
-        String renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow();
+            .orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
+        String renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow(() -> new IllegalArgumentException("host must be provided"));
 
         OAuthToken oauthToken = fetchOAuthToken(
             runContext, renderedHost, renderedWorkspaceId, clientId, clientSecret,
@@ -589,5 +598,23 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             this.accessToken = accessToken;
             this.expiresIn = expiresIn;
         }
+    }
+
+    // Ion timestamps are converted to ISO-8601 strings and the class is matched by name to avoid a compile dependency on ion-java.
+    private static Object convertIonValues(Object value) {
+        if (value instanceof java.util.Map) {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> map = (java.util.Map<String, Object>) value;
+            map.replaceAll((k, v) -> convertIonValues(v));
+            return map;
+        } else if (value instanceof java.util.List) {
+            @SuppressWarnings("unchecked")
+            java.util.List<Object> list = (java.util.List<Object>) value;
+            list.replaceAll(v -> convertIonValues(v));
+            return list;
+        } else if (value != null && "com.amazon.ion.Timestamp".equals(value.getClass().getName())) {
+            return value.toString();
+        }
+        return value;
     }
 }
