@@ -214,7 +214,8 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 String fromUri = runContext.render(this.from).as(String.class)
                     .orElseThrow(() -> new IllegalArgumentException("from must be provided"));
                 inputStream = runContext.storage().getFile(URI.create(fromUri));
-                iterator = JacksonMapper.ofIon().readerFor(new TypeReference<Map<String, Object>>() {}).readValues(inputStream);
+                iterator = JacksonMapper.ofIon().readerFor(new TypeReference<Map<String, Object>>() {
+                }).readValues(inputStream);
             }
 
             try {

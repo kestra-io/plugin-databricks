@@ -223,12 +223,12 @@ class WriteRecordsTest {
     @Test
     void inlineListNullElementThrowsException() throws Exception {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
-        
+
         List<Map<String, Object>> recordsWithNull = new ArrayList<>();
         recordsWithNull.add(Map.of("id", 1));
         recordsWithNull.add(null);
         recordsWithNull.add(Map.of("id", 3));
-        
+
         WriteRecords task = baseBuilder()
             .records(Property.of(recordsWithNull))
             .build();
