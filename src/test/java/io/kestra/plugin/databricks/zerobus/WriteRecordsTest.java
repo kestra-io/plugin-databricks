@@ -280,6 +280,31 @@ class WriteRecordsTest {
     }
 
     @Test
+    void chunkingMalformedBinaryThrows() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+
+        String hex = "E00100EAEEA18183DE9D87BE9A8269648474656D70866163746976658474696D6585656D707479DE9D8A2101848574657374318B53C100E18C118D68800FE881818080808E0FDA8A210284857465737432";
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        // Truncate 1 byte (nextValue throws on record 2)
+        byte[] truncated = java.util.Arrays.copyOf(bytes, bytes.length - 1);
+
+        File binFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(binFile)) {
+            fos.write(truncated);
+        }
+        URI binUri = runContext.storage().putFile(binFile);
+
+        WriteRecords task = baseBuilder().from(Property.of(binUri.toString())).build();
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertTrue(e.getMessage().contains("Failed to parse record 2"));
+        assertTrue(receivedRecords.isEmpty());
+    }
+
+    @Test
     void chunkingExactlyMaxRecords() throws Exception {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
         List<Map<String, Object>> recs = new ArrayList<>();
@@ -390,8 +415,6 @@ class WriteRecordsTest {
 
         assertThat(output.getRecordsCount(), is(0L));
         assertThat(chunkCount.get(), is(0));
-        // Empty inline list shouldn't even trigger auth fetch since we short-circuit early
-        // Actually, if we short circuit after fetching token, that's fine too. But we know count is 0.
     }
 
     @Test
@@ -501,9 +524,7 @@ class WriteRecordsTest {
         if (cause != null) {
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            java.io.StringWriter sw = new java.io.StringWriter();
-            cause.printStackTrace(new java.io.PrintWriter(sw));
-            String stackTrace = sw.toString();
+            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
         }
@@ -558,9 +579,7 @@ class WriteRecordsTest {
         if (cause != null) {
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            java.io.StringWriter sw = new java.io.StringWriter();
-            cause.printStackTrace(new java.io.PrintWriter(sw));
-            String stackTrace = sw.toString();
+            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
         }
@@ -763,7 +782,6 @@ class WriteRecordsTest {
             .build();
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> task.run(TestsUtils.mockRunContext(runContextFactory, task, null)));
-        e.printStackTrace();
         assertTrue(e.getMessage().contains("Other authentication types are not supported"));
     }
 
@@ -798,7 +816,6 @@ class WriteRecordsTest {
             .build();
 
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> task.run(TestsUtils.mockRunContext(runContextFactory, task, null)));
-        e.printStackTrace();
         assertTrue(e.getMessage().contains("access_token in response is not a string"));
     }
 
@@ -966,9 +983,7 @@ class WriteRecordsTest {
         if (cause != null) {
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            java.io.StringWriter sw = new java.io.StringWriter();
-            cause.printStackTrace(new java.io.PrintWriter(sw));
-            String stackTrace = sw.toString();
+            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
             assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
         }
