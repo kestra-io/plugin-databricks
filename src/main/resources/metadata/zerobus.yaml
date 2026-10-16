@@ -1,0 +1,8 @@
+group: io.kestra.plugin.databricks.zerobus
+name: "zerobus"
+title: "Databricks Zerobus"
+description: "Tasks that interact with the Databricks Zerobus Ingest API."
+body: "Push data directly into Databricks Unity Catalog Delta tables using the Zerobus Ingest REST API."
+videos: []
+createdBy: "Kestra Core Team"
+managedBy: "Kestra Core Team"
