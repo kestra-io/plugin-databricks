@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.base.Throwables;
 import com.sun.net.httpserver.HttpServer;
 
 import io.kestra.core.models.property.Property;
@@ -280,7 +281,7 @@ class WriteRecordsTest {
     }
 
     @Test
-    void chunkingMalformedBinaryThrows() throws Exception {
+    void truncatedBinaryIonThrows() throws Exception {
         RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
 
         String hex = "E00100EAEEA18183DE9D87BE9A8269648474656D70866163746976658474696D6585656D707479DE9D8A2101848574657374318B53C100E18C118D68800FE881818080808E0FDA8A210284857465737432";
@@ -517,17 +518,7 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("at-least-once delivery"));
 
         // Ensure no secrets are leaked
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-
-        Throwable cause = ex.getCause();
-        if (cause != null) {
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
-        }
+        assertNoSecrets(ex);
 
         long recordCountMetric = runContext.metrics().stream()
             .filter(m -> m.getName().equals("records.count"))
@@ -572,17 +563,7 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("at-least-once delivery"));
 
         // Ensure no secrets are leaked
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-
-        Throwable cause = ex.getCause();
-        if (cause != null) {
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
-        }
+        assertNoSecrets(ex);
     }
 
     @Test
@@ -600,8 +581,7 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("Zerobus Ingest rejected the request (HTTP 403)"));
         assertThat(ex.getMessage(), containsString("Permission Denied"));
         assertThat(ex.getMessage(), containsString("Check that the table 'my_cat.my_schema.my_table' exists"));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+        assertNoSecrets(ex);
         assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("qa_secret")));
     }
 
@@ -976,17 +956,7 @@ class WriteRecordsTest {
         assertThat(tokenRequestCount.get(), is(2));
 
         // Ensure no secrets are leaked
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-        assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-
-        Throwable cause = ex.getCause();
-        if (cause != null) {
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(cause.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
-            String stackTrace = java.util.Arrays.toString(cause.getStackTrace());
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
-            assertThat(stackTrace, org.hamcrest.Matchers.not(containsString("secret")));
-        }
+        assertNoSecrets(ex);
     }
 
     @Test
@@ -1030,4 +1000,45 @@ class WriteRecordsTest {
         assertThat(tokenRequestCount.get(), is(1)); // Because 3600 is > margin, no refresh
     }
 
+    @Test
+    void rootJsonArrayInFromThrowsIllegalArgumentException() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        File tempFile = runContext.workingDir().createTempFile(".json").toFile();
+        try (FileWriter writer = new FileWriter(tempFile)) {
+            writer.write("\n  [{\"id\": 1}, {\"id\": 2}]\n");
+        }
+        URI uri = runContext.storage().putFile(tempFile);
+
+        WriteRecords task = baseBuilder()
+            .from(Property.of(uri.toString()))
+            .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), is("'from' must contain one record per line (Ion or JSON lines), not a single JSON array."));
+        assertThat(chunkCount.get(), is(0));
+        assertThat(tokenRequestCount.get(), is(0));
+    }
+
+    @Test
+    void scalarOnlyInFromThrowsException() throws Exception {
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        File tempFile = runContext.workingDir().createTempFile(".ion").toFile();
+        try (FileWriter writer = new FileWriter(tempFile)) {
+            writer.write("\"abc\"");
+        }
+        URI uri = runContext.storage().putFile(tempFile);
+
+        WriteRecords task = baseBuilder()
+            .from(Property.of(uri.toString()))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(ex.getMessage(), is("Record 1 is not an object."));
+    }
+
+    private void assertNoSecrets(Throwable t) {
+        var trace = Throwables.getStackTraceAsString(t);
+        assertThat(trace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
+        assertThat(trace, org.hamcrest.Matchers.not(containsString("secret")));
+    }
 }

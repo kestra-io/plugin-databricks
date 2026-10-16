@@ -11,11 +11,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 
 import io.kestra.core.http.HttpRequest;
-import io.kestra.core.http.HttpResponse;
 import io.kestra.core.http.client.HttpClient;
 import io.kestra.core.http.client.HttpClientResponseException;
 import io.kestra.core.http.client.configurations.HttpConfiguration;
@@ -55,7 +57,8 @@ import lombok.experimental.SuperBuilder;
                 type: io.kestra.plugin.databricks.zerobus.WriteRecords
                 host: "{{ secret('DATABRICKS_HOST') }}"
                 authentication:
-                  token: "{{ secret('DATABRICKS_TOKEN') }}"
+                  clientId: "{{ secret('DATABRICKS_CLIENT_ID') }}"
+                  clientSecret: "{{ secret('DATABRICKS_CLIENT_SECRET') }}"
                 workspaceId: "{{ secret('DATABRICKS_WORKSPACE_ID') }}"
                 region: us-east-1
                 catalog: main
@@ -71,6 +74,10 @@ import lombok.experimental.SuperBuilder;
             id: write_file_to_databricks
             namespace: company.team
 
+            inputs:
+              - id: events_file
+                type: FILE
+
             tasks:
               - id: write_records
                 type: io.kestra.plugin.databricks.zerobus.WriteRecords
@@ -83,7 +90,7 @@ import lombok.experimental.SuperBuilder;
                 catalog: main
                 schema: events
                 table: raw_events
-                from: "{{ outputs.fetch_events.uri }}"
+                from: "{{ inputs.events_file }}"
             """)
     },
     metrics = {
@@ -95,15 +102,16 @@ import lombok.experimental.SuperBuilder;
 
     It supports at-least-once delivery. If a task is retried after a partial failure, records that were already
     successfully accepted in previous chunks will be sent again and may be duplicated in the target table.
+    Kestra's HTTP client may retry a failed request once on a server error, so with at-least-once delivery a chunk can be written twice.
 
     The task authenticates using either OAuth client credentials or a Personal Access Token (PAT).
     An OAuth token is refreshed shortly before it expires, and a 401 on the ingest call triggers one refresh and one retry of that chunk. A PAT is never refreshed or retried.
-    **Note:** PAT authentication is documented as unverified against Zerobus Ingest; use OAuth client credentials if possible.
+    **Note**: PAT authentication is documented as unverified against Zerobus Ingest; use OAuth client credentials if possible.
     The `host` property is required when using OAuth authentication.
 
     Records are sent in chunks, bounded by conservative assumptions since the API docs do not specify a per-request limit.
 
-    **Note:** The inherited properties `configFile` and `accountId` are ignored by this task, and `AbstractTask` environment variable fallbacks are not honoured.
+    **Note**: The inherited properties `configFile` and `accountId` are ignored by this task, and `AbstractTask` environment variable fallbacks are not honoured.
     """)
 public class WriteRecords extends AbstractTask implements RunnableTask<WriteRecords.Output> {
     private static final String UNSUPPORTED_AUTH_MSG = "Zerobus Ingest REST requires either a personal access token (authentication.token) or OAuth client credentials (authentication.clientId + authentication.clientSecret). Other authentication types are not supported.";
@@ -143,14 +151,17 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     @PluginProperty(group = "main")
     private Property<List<Map<String, Object>>> records;
 
-    @Schema(title = "Internal storage URI", description = "URI of an Ion or JSON-lines file. Mutually exclusive with 'records'.")
+    @Schema(
+        title = "Internal storage URI",
+        description = "URI of an Ion or JSON-lines file in Kestra internal storage. Each record must be one object; a single JSON array is not supported. Mutually exclusive with 'records'."
+    )
     @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
 
     @Override
     public Output run(RunContext runContext) throws Exception {
-        boolean hasRecords = this.records != null;
-        boolean hasFrom = this.from != null;
+        var hasRecords = this.records != null;
+        var hasFrom = this.from != null;
 
         if (hasRecords == hasFrom) {
             if (hasRecords) {
@@ -162,9 +173,9 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             }
         }
 
-        String renderedEndpoint = runContext.render(this.endpoint).as(String.class).orElse(null);
-        String renderedRegion = runContext.render(this.region).as(String.class).orElse(null);
-        String renderedWorkspaceId = runContext.render(this.workspaceId).as(String.class).orElse(null);
+        var renderedEndpoint = runContext.render(this.endpoint).as(String.class).orElse(null);
+        var renderedRegion = runContext.render(this.region).as(String.class).orElse(null);
+        var renderedWorkspaceId = runContext.render(this.workspaceId).as(String.class).orElse(null);
 
         if (renderedEndpoint == null && renderedRegion == null) {
             throw new IllegalArgumentException(
@@ -172,13 +183,13 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             );
         }
 
-        String renderedCatalog = runContext.render(this.catalog).as(String.class)
+        var renderedCatalog = runContext.render(this.catalog).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("catalog must be provided"));
-        String renderedSchema = runContext.render(this.schema).as(String.class)
+        var renderedSchema = runContext.render(this.schema).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("schema must be provided"));
-        String renderedTable = runContext.render(this.table).as(String.class)
+        var renderedTable = runContext.render(this.table).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("table must be provided"));
-        String renderedHost = this.getHost() != null ? runContext.render(this.getHost()).as(String.class).orElse(null)
+        var renderedHost = this.getHost() != null ? runContext.render(this.getHost()).as(String.class).orElse(null)
             : null;
         validateAuthentication(runContext, renderedWorkspaceId, renderedHost);
 
@@ -186,12 +197,12 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             throw new IllegalArgumentException("workspaceId is required when endpoint is not set.");
         }
 
-        String ingestUrl = buildIngestUrl(
+        var ingestUrl = buildIngestUrl(
             renderedEndpoint, renderedWorkspaceId, renderedRegion, renderedCatalog,
             renderedSchema, renderedTable
         );
 
-        AtomicLong totalAcceptedCount = new AtomicLong(0);
+        var totalAcceptedCount = new AtomicLong(0);
         try (
             var httpClient = HttpClient.builder()
                 .runContext(runContext)
@@ -209,16 +220,22 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 : null;
 
             InputStream inputStream = null;
+            JsonParser parser = null;
             MappingIterator<Map<String, Object>> iterator = null;
-            if (!hasRecords) {
-                String fromUri = runContext.render(this.from).as(String.class)
-                    .orElseThrow(() -> new IllegalArgumentException("from must be provided"));
-                inputStream = runContext.storage().getFile(URI.create(fromUri));
-                iterator = JacksonMapper.ofIon().readerFor(new TypeReference<Map<String, Object>>() {
-                }).readValues(inputStream);
-            }
-
             try {
+                if (!hasRecords) {
+                    var fromUri = runContext.render(this.from).as(String.class)
+                        .orElseThrow(() -> new IllegalArgumentException("from must be provided"));
+                    inputStream = runContext.storage().getFile(URI.create(fromUri));
+                    parser = JacksonMapper.ofIon().getFactory().createParser(inputStream);
+                    var first = parser.nextToken();
+                    if (first == JsonToken.START_ARRAY) {
+                        throw new IllegalArgumentException("'from' must contain one record per line (Ion or JSON lines), not a single JSON array.");
+                    }
+                    iterator = JacksonMapper.ofIon().readerFor(new TypeReference<Map<String, Object>>() {
+                    }).readValues(parser);
+                }
+
                 int inlineIndex = 0;
                 int recordOrdinal = 0;
                 while (true) {
@@ -226,7 +243,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                     if (hasRecords) {
                         if (inlineIndex < recordsList.size()) {
                             recordOrdinal++;
-                            Map<String, Object> listElement = recordsList.get(inlineIndex++);
+                            var listElement = recordsList.get(inlineIndex++);
                             if (listElement == null) {
                                 throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
                             }
@@ -244,7 +261,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                             Map<String, Object> mapObj;
                             try {
                                 mapObj = iterator.nextValue();
-                            } catch (com.fasterxml.jackson.databind.exc.MismatchedInputException e) {
+                            } catch (MismatchedInputException e) {
                                 throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
                             } catch (Exception e) {
                                 throw new IllegalStateException("Failed to parse record " + recordOrdinal + ": " + e.getMessage(), e);
@@ -253,7 +270,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                                 throw new IllegalStateException("Record " + recordOrdinal + " is not an object.");
                             }
                             @SuppressWarnings("unchecked")
-                            Map<String, Object> castedRecord = (Map<String, Object>) convertIonValues(mapObj);
+                            var castedRecord = (Map<String, Object>) convertIonValues(mapObj);
                             record = castedRecord;
                         }
                     }
@@ -262,7 +279,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                         break;
                     }
 
-                    byte[] recordBytes = JacksonMapper.ofJson().writeValueAsBytes(record);
+                    var recordBytes = JacksonMapper.ofJson().writeValueAsBytes(record);
 
                     if (
                         !chunk.isEmpty() && (chunk.size() >= MAX_RECORDS_PER_CHUNK
@@ -291,6 +308,9 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             } finally {
                 if (iterator != null) {
                     iterator.close();
+                }
+                if (parser != null) {
+                    parser.close();
                 }
                 if (inputStream != null) {
                     inputStream.close();
@@ -334,7 +354,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private void sendChunk(HttpClient httpClient, String url, String token, List<Map<String, Object>> chunk,
         String catalog, String schema, String table, AtomicLong alreadyAccepted) throws Exception {
-        HttpRequest request = HttpRequest.builder()
+        var request = HttpRequest.builder()
             .uri(URI.create(url))
             .method("POST")
             .body(HttpRequest.JsonRequestBody.of(chunk))
@@ -355,10 +375,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     private IllegalStateException mapSendChunkException(HttpClientResponseException e, String catalog, String schema,
         String table, AtomicLong alreadyAccepted) {
         int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
-        String body = readHttpErrorBody(e);
+        var body = readHttpErrorBody(e);
 
         if (status >= 400 && status < 500) {
-            String advice = (status == 403 || status == 404) ? String.format(
+            var advice = (status == 403 || status == 404) ? String.format(
                 " Check that the table '%s.%s.%s' exists, the schema matches, and the service principal has USE CATALOG, USE SCHEMA, SELECT, and MODIFY privileges.",
                 catalog, schema, table
             ) : "";
@@ -384,9 +404,9 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private void refreshOAuthToken(TokenHolder tokenHolder, RunContext runContext, String host, String workspaceId,
         String catalog, String schema, String table) throws Exception {
-        String clientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
-        String clientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
-        OAuthToken refreshed = fetchOAuthToken(
+        var clientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
+        var clientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
+        var refreshed = fetchOAuthToken(
             runContext, host, workspaceId, clientId, clientSecret, catalog, schema, table
         );
         tokenHolder.update(refreshed.accessToken, refreshed.expiresIn);
@@ -405,9 +425,9 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     private void validateAuthentication(RunContext runContext, String renderedWorkspaceId, String renderedHost)
         throws Exception {
         if (this.getAuthentication() != null) {
-            String token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
-            String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElse(null);
-            String clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
+            var token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+            var clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElse(null);
+            var clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
                 .orElse(null);
 
             if (token != null) {
@@ -427,17 +447,17 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private TokenHolder resolveBearerToken(RunContext runContext, String renderedWorkspaceId, String renderedCatalog,
         String renderedSchema, String renderedTable) throws Exception {
-        String token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+        var token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
         if (token != null) {
             return new TokenHolder(token, true, 0);
         }
 
-        String clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
-        String clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
+        var clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
+        var clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
-        String renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow(() -> new IllegalArgumentException("host must be provided"));
+        var renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow(() -> new IllegalArgumentException("host must be provided"));
 
-        OAuthToken oauthToken = fetchOAuthToken(
+        var oauthToken = fetchOAuthToken(
             runContext, renderedHost, renderedWorkspaceId, clientId, clientSecret,
             renderedCatalog, renderedSchema, renderedTable
         );
@@ -446,16 +466,16 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     static OAuthToken fetchOAuthToken(RunContext runContext, String host, String workspaceId, String clientId, String clientSecret, String catalog, String schema, String table)
         throws Exception {
-        String cleanHost = host.endsWith("/") ? host.substring(0, host.length() - 1) : host;
-        String tokenUrl = cleanHost + "/oidc/v1/token";
+        var cleanHost = host.endsWith("/") ? host.substring(0, host.length() - 1) : host;
+        var tokenUrl = cleanHost + "/oidc/v1/token";
 
-        List<Map<String, Object>> authDetails = List.of(
+        var authDetails = List.of(
             Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE CATALOG"), "object_type", "CATALOG", "object_full_path", catalog),
             Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE SCHEMA"), "object_type", "SCHEMA", "object_full_path", catalog + "." + schema),
             Map.of("type", "unity_catalog_privileges", "privileges", List.of("SELECT", "MODIFY"), "object_type", "TABLE", "object_full_path", catalog + "." + schema + "." + table)
         );
 
-        String authDetailsJson = JacksonMapper.ofJson().writeValueAsString(authDetails);
+        var authDetailsJson = JacksonMapper.ofJson().writeValueAsString(authDetails);
 
         Map<String, Object> formParams = Map.of(
             "grant_type", "client_credentials",
@@ -464,7 +484,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             "authorization_details", authDetailsJson
         );
 
-        String basicAuth = "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+        var basicAuth = "Basic " + Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
 
         try (
             var httpClient = HttpClient.builder()
@@ -473,7 +493,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 .build()
         ) {
 
-            HttpRequest request = HttpRequest.builder()
+            var request = HttpRequest.builder()
                 .uri(URI.create(tokenUrl))
                 .method("POST")
                 .body(HttpRequest.UrlEncodedRequestBody.of(formParams))
@@ -486,7 +506,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 )
                 .build();
 
-            HttpResponse<String> response = httpClient.request(request, String.class);
+            var response = httpClient.request(request, String.class);
 
             Map<String, Object> body = JacksonMapper.ofJson().readValue(response.getBody(), new TypeReference<>() {
             });
@@ -521,13 +541,13 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             }
         } catch (HttpClientResponseException e) {
             int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
-            String body = readHttpErrorBody(e);
+            var body = readHttpErrorBody(e);
             throw new IllegalStateException(String.format("Failed to obtain an OAuth token from %s (HTTP %d): %s. Check clientId and clientSecret.", tokenUrl, status, truncate(body)));
         }
     }
 
     static String buildIngestUrl(String endpoint, String workspaceId, String region, String catalog, String schema, String table) {
-        String base = endpoint != null ? (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint)
+        var base = endpoint != null ? (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint)
             : "https://" + workspaceId + ".zerobus." + region + ".cloud.databricks.com";
         return base + "/zerobus/v1/tables/" + encode(catalog) + "." + encode(schema) + "." + encode(table) + "/insert";
     }
@@ -603,14 +623,14 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     // Ion timestamps are converted to ISO-8601 strings and the class is matched by name to avoid a compile dependency on ion-java.
     private static Object convertIonValues(Object value) {
-        if (value instanceof java.util.Map) {
+        if (value instanceof Map) {
             @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> map = (java.util.Map<String, Object>) value;
+            var map = (Map<String, Object>) value;
             map.replaceAll((k, v) -> convertIonValues(v));
             return map;
-        } else if (value instanceof java.util.List) {
+        } else if (value instanceof List) {
             @SuppressWarnings("unchecked")
-            java.util.List<Object> list = (java.util.List<Object>) value;
+            var list = (List<Object>) value;
             list.replaceAll(v -> convertIonValues(v));
             return list;
         } else if (value != null && "com.amazon.ion.Timestamp".equals(value.getClass().getName())) {
