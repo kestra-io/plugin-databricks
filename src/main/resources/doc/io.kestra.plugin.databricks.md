@@ -61,3 +61,7 @@ Each run calls `WorkspaceClient.postgres().generateDatabaseCredential` and opens
 Set `database` to the Postgres database name. `host` is optional: when it is omitted, the Postgres hostname is resolved from the endpoint (`status.hosts.host`). `port` defaults to `5432`. The service principal needs Workspace access and a matching Postgres OAuth role.
 
 `lakebase.Query` runs one statement. `fetchType` is `FETCH` (default), `FETCH_ONE`, `STORE`, or `NONE`. `lakebase.Batch` runs a prepared statement once per row from `parameterGroups` or from an Ion file (`from`). `lakebase.Trigger` polls on `interval` (default `PT1M`) and fires when the query returns at least one row.
+
+## Zerobus Ingest
+
+WriteRecords pushes records into a Unity Catalog Delta table through the Zerobus Ingest REST API; authentication with OAuth client credentials (host, authentication.clientId and clientSecret) plus workspaceId and either region or endpoint, a PAT is accepted but unverified against Zerobus; input is `records` (inline list of objects) or `from` (a file in internal storage, Ion or JSON lines, one record per line, a single JSON array is not supported); records are sent in chunks of up to 500 records or 4 MB; delivery is at-least-once so a retried task can write records twice.

@@ -9,19 +9,19 @@ import org.junit.jupiter.api.condition.DisabledIf;
 
 import com.google.common.base.Strings;
 
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.databricks.AbstractTask.AuthenticationConfig;
 
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 
-@MicronautTest
+@KestraTest
 @DisabledIf(value = "canNotBeEnabled", disabledReason = "Requires Databricks Zerobus env vars")
 class WriteRecordsIntegrationTest {
 

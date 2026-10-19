@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Throwables;
 import com.sun.net.httpserver.HttpServer;
 
+import io.kestra.core.junit.annotations.KestraTest;
 import io.kestra.core.models.property.Property;
 import io.kestra.core.runners.RunContext;
 import io.kestra.core.runners.RunContextFactory;
@@ -27,7 +28,6 @@ import io.kestra.core.serializers.JacksonMapper;
 import io.kestra.core.utils.TestsUtils;
 import io.kestra.plugin.databricks.AbstractTask.AuthenticationConfig;
 
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -36,7 +36,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@MicronautTest
+@KestraTest
 class WriteRecordsTest {
 
     @Inject
@@ -1040,5 +1040,79 @@ class WriteRecordsTest {
         var trace = Throwables.getStackTraceAsString(t);
         assertThat(trace, org.hamcrest.Matchers.not(containsString("mock_oauth_token")));
         assertThat(trace, org.hamcrest.Matchers.not(containsString("secret")));
+    }
+
+    @Test
+    void emptyTokenResponseBodyThrows() throws Exception {
+        server.removeContext("/oidc/v1/token");
+        server.createContext("/oidc/v1/token", exchange ->
+        {
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().close();
+            exchange.close();
+        });
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder()
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(
+            ex.getMessage(), is(
+                "Failed to obtain an OAuth token from " + endpoint + "/oidc/v1/token (HTTP 200): empty response body. Check host."
+            )
+        );
+        assertThat(chunkCount.get(), is(0));
+    }
+
+    @Test
+    void literalNullTokenResponseBodyThrows() throws Exception {
+        server.removeContext("/oidc/v1/token");
+        server.createContext("/oidc/v1/token", exchange ->
+        {
+            byte[] body = "null".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder()
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(
+            ex.getMessage(), is(
+                "Failed to obtain an OAuth token from " + endpoint + "/oidc/v1/token (HTTP 200): the response is not a JSON object. Check host."
+            )
+        );
+        assertThat(chunkCount.get(), is(0));
+    }
+
+    @Test
+    void htmlTokenResponseBodyThrows() throws Exception {
+        server.removeContext("/oidc/v1/token");
+        server.createContext("/oidc/v1/token", exchange ->
+        {
+            byte[] body = "<html><body>Service Unavailable</body></html>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, buildTask(), Map.of());
+        WriteRecords task = baseBuilder()
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> task.run(runContext));
+        assertThat(
+            ex.getMessage(), is(
+                "Failed to obtain an OAuth token from " + endpoint + "/oidc/v1/token (HTTP 200): the response is not valid JSON. Check host."
+            )
+        );
+        assertThat(chunkCount.get(), is(0));
     }
 }

@@ -173,33 +173,33 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             }
         }
 
-        var renderedEndpoint = runContext.render(this.endpoint).as(String.class).orElse(null);
-        var renderedRegion = runContext.render(this.region).as(String.class).orElse(null);
-        var renderedWorkspaceId = runContext.render(this.workspaceId).as(String.class).orElse(null);
+        var rEndpoint = runContext.render(this.endpoint).as(String.class).orElse(null);
+        var rRegion = runContext.render(this.region).as(String.class).orElse(null);
+        var rWorkspaceId = runContext.render(this.workspaceId).as(String.class).orElse(null);
 
-        if (renderedEndpoint == null && renderedRegion == null) {
+        if (rEndpoint == null && rRegion == null) {
             throw new IllegalArgumentException(
                 "Either 'endpoint' or 'region' must be set to determine the Zerobus Ingest server."
             );
         }
 
-        var renderedCatalog = runContext.render(this.catalog).as(String.class)
+        var rCatalog = runContext.render(this.catalog).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("catalog must be provided"));
-        var renderedSchema = runContext.render(this.schema).as(String.class)
+        var rSchema = runContext.render(this.schema).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("schema must be provided"));
-        var renderedTable = runContext.render(this.table).as(String.class)
+        var rTable = runContext.render(this.table).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("table must be provided"));
-        var renderedHost = this.getHost() != null ? runContext.render(this.getHost()).as(String.class).orElse(null)
+        var rHost = this.getHost() != null ? runContext.render(this.getHost()).as(String.class).orElse(null)
             : null;
-        validateAuthentication(runContext, renderedWorkspaceId, renderedHost);
+        validateAuthentication(runContext, rWorkspaceId, rHost);
 
-        if (renderedEndpoint == null && renderedWorkspaceId == null) {
+        if (rEndpoint == null && rWorkspaceId == null) {
             throw new IllegalArgumentException("workspaceId is required when endpoint is not set.");
         }
 
         var ingestUrl = buildIngestUrl(
-            renderedEndpoint, renderedWorkspaceId, renderedRegion, renderedCatalog,
-            renderedSchema, renderedTable
+            rEndpoint, rWorkspaceId, rRegion, rCatalog,
+            rSchema, rTable
         );
 
         var totalAcceptedCount = new AtomicLong(0);
@@ -224,9 +224,9 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             MappingIterator<Map<String, Object>> iterator = null;
             try {
                 if (!hasRecords) {
-                    var fromUri = runContext.render(this.from).as(String.class)
+                    var rFrom = runContext.render(this.from).as(String.class)
                         .orElseThrow(() -> new IllegalArgumentException("from must be provided"));
-                    inputStream = runContext.storage().getFile(URI.create(fromUri));
+                    inputStream = runContext.storage().getFile(URI.create(rFrom));
                     parser = JacksonMapper.ofIon().getFactory().createParser(inputStream);
                     var first = parser.nextToken();
                     if (first == JsonToken.START_ARRAY) {
@@ -285,10 +285,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                         !chunk.isEmpty() && (chunk.size() >= MAX_RECORDS_PER_CHUNK
                             || currentChunkBytes + recordBytes.length > MAX_BYTES_PER_CHUNK)
                     ) {
-                        tokenHolder = getOrRefreshBearerToken(tokenHolder, runContext, renderedWorkspaceId, renderedCatalog, renderedSchema, renderedTable, renderedHost);
+                        tokenHolder = getOrRefreshBearerToken(tokenHolder, runContext, rWorkspaceId, rCatalog, rSchema, rTable, rHost);
                         sendChunkWithRetry(
-                            httpClient, ingestUrl, tokenHolder, chunk, renderedCatalog, renderedSchema,
-                            renderedTable, totalAcceptedCount, runContext, renderedHost, renderedWorkspaceId
+                            httpClient, ingestUrl, tokenHolder, chunk, rCatalog, rSchema,
+                            rTable, totalAcceptedCount, runContext, rHost, rWorkspaceId
                         );
                         chunk.clear();
                         currentChunkBytes = 0;
@@ -299,10 +299,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 }
 
                 if (!chunk.isEmpty()) {
-                    tokenHolder = getOrRefreshBearerToken(tokenHolder, runContext, renderedWorkspaceId, renderedCatalog, renderedSchema, renderedTable, renderedHost);
+                    tokenHolder = getOrRefreshBearerToken(tokenHolder, runContext, rWorkspaceId, rCatalog, rSchema, rTable, rHost);
                     sendChunkWithRetry(
-                        httpClient, ingestUrl, tokenHolder, chunk, renderedCatalog, renderedSchema,
-                        renderedTable, totalAcceptedCount, runContext, renderedHost, renderedWorkspaceId
+                        httpClient, ingestUrl, tokenHolder, chunk, rCatalog, rSchema,
+                        rTable, totalAcceptedCount, runContext, rHost, rWorkspaceId
                     );
                 }
             } finally {
@@ -404,10 +404,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private void refreshOAuthToken(TokenHolder tokenHolder, RunContext runContext, String host, String workspaceId,
         String catalog, String schema, String table) throws Exception {
-        var clientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
-        var clientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
+        var rClientId = runContext.render(getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
+        var rClientSecret = runContext.render(getAuthentication().getClientSecret()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
         var refreshed = fetchOAuthToken(
-            runContext, host, workspaceId, clientId, clientSecret, catalog, schema, table
+            runContext, host, workspaceId, rClientId, rClientSecret, catalog, schema, table
         );
         tokenHolder.update(refreshed.accessToken, refreshed.expiresIn);
     }
@@ -422,21 +422,21 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         return currentHolder;
     }
 
-    private void validateAuthentication(RunContext runContext, String renderedWorkspaceId, String renderedHost)
+    private void validateAuthentication(RunContext runContext, String rWorkspaceId, String rHost)
         throws Exception {
         if (this.getAuthentication() != null) {
-            var token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
-            var clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElse(null);
-            var clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
+            var rToken = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+            var rClientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElse(null);
+            var rClientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
                 .orElse(null);
 
-            if (token != null) {
+            if (rToken != null) {
                 return;
-            } else if (clientId != null && clientSecret != null) {
-                if (renderedWorkspaceId == null) {
+            } else if (rClientId != null && rClientSecret != null) {
+                if (rWorkspaceId == null) {
                     throw new IllegalArgumentException("workspaceId is required when using OAuth authentication.");
                 }
-                if (renderedHost == null) {
+                if (rHost == null) {
                     throw new IllegalArgumentException("host is required when using OAuth authentication.");
                 }
                 return;
@@ -445,21 +445,21 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         throw new IllegalArgumentException(UNSUPPORTED_AUTH_MSG);
     }
 
-    private TokenHolder resolveBearerToken(RunContext runContext, String renderedWorkspaceId, String renderedCatalog,
-        String renderedSchema, String renderedTable) throws Exception {
-        var token = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
-        if (token != null) {
-            return new TokenHolder(token, true, 0);
+    private TokenHolder resolveBearerToken(RunContext runContext, String rWorkspaceId, String rCatalog,
+        String rSchema, String rTable) throws Exception {
+        var rToken = runContext.render(this.getAuthentication().getToken()).as(String.class).orElse(null);
+        if (rToken != null) {
+            return new TokenHolder(rToken, true, 0);
         }
 
-        var clientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
-        var clientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
+        var rClientId = runContext.render(this.getAuthentication().getClientId()).as(String.class).orElseThrow(() -> new IllegalArgumentException("clientId must be provided"));
+        var rClientSecret = runContext.render(this.getAuthentication().getClientSecret()).as(String.class)
             .orElseThrow(() -> new IllegalArgumentException("clientSecret must be provided"));
-        var renderedHost = runContext.render(this.getHost()).as(String.class).orElseThrow(() -> new IllegalArgumentException("host must be provided"));
+        var rHost = runContext.render(this.getHost()).as(String.class).orElseThrow(() -> new IllegalArgumentException("host must be provided"));
 
         var oauthToken = fetchOAuthToken(
-            runContext, renderedHost, renderedWorkspaceId, clientId, clientSecret,
-            renderedCatalog, renderedSchema, renderedTable
+            runContext, rHost, rWorkspaceId, rClientId, rClientSecret,
+            rCatalog, rSchema, rTable
         );
         return new TokenHolder(oauthToken.accessToken, false, oauthToken.expiresIn);
     }
@@ -508,8 +508,32 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
             var response = httpClient.request(request, String.class);
 
-            Map<String, Object> body = JacksonMapper.ofJson().readValue(response.getBody(), new TypeReference<>() {
-            });
+            var responseBody = response.getBody();
+            if (responseBody == null || responseBody.isBlank()) {
+                throw new IllegalStateException(
+                    "Failed to obtain an OAuth token from " + tokenUrl
+                        + " (HTTP 200): empty response body. Check host."
+                );
+            }
+
+            Map<String, Object> body;
+            try {
+                body = JacksonMapper.ofJson().readValue(responseBody, new TypeReference<>() {
+                });
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                    "Failed to obtain an OAuth token from " + tokenUrl
+                        + " (HTTP 200): the response is not valid JSON. Check host."
+                );
+            }
+
+            if (body == null) {
+                throw new IllegalStateException(
+                    "Failed to obtain an OAuth token from " + tokenUrl
+                        + " (HTTP 200): the response is not a JSON object. Check host."
+                );
+            }
+
             long expiresIn = 3600;
             if (body.containsKey("expires_in")) {
                 Object exp = body.get("expires_in");
