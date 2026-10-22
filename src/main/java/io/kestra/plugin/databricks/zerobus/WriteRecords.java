@@ -135,25 +135,30 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     @PluginProperty(group = "main")
     private Property<String> table;
 
-    @Schema(title = "Numeric workspace ID", description = "Used to build the Zerobus endpoint and OAuth resource parameter.")
+    @Schema(title = "Numeric workspace ID", description = """
+        Used to build the Zerobus endpoint and OAuth resource parameter.""")
     @PluginProperty(group = "connection")
     private Property<String> workspaceId;
 
-    @Schema(title = "Cloud region", description = "Region (e.g. us-east-1). Ignored when 'endpoint' is set. Required when 'endpoint' is not set.")
+    @Schema(title = "Cloud region", description = """
+        Region (e.g. us-east-1). Ignored when 'endpoint' is set. Required when 'endpoint' is not set.""")
     @PluginProperty(group = "connection")
     private Property<String> region;
 
-    @Schema(title = "Zerobus endpoint URL override", description = "Replaces the auto-computed URL (e.g. https://my-proxy).")
+    @Schema(title = "Zerobus endpoint URL override", description = """
+        Replaces the auto-computed URL (e.g. https://my-proxy).""")
     @PluginProperty(group = "connection")
     private Property<String> endpoint;
 
-    @Schema(title = "Inline records", description = "List of JSON objects. Mutually exclusive with 'from'.")
+    @Schema(title = "Inline records", description = """
+        List of JSON objects. Mutually exclusive with 'from'.""")
     @PluginProperty(group = "main")
     private Property<List<Map<String, Object>>> records;
 
     @Schema(
         title = "Internal storage URI",
-        description = "URI of an Ion or JSON-lines file in Kestra internal storage. Each record must be one object; a single JSON array is not supported. Mutually exclusive with 'records'."
+        description = """
+            URI of an Ion or JSON-lines file in Kestra internal storage. Each record must be one object; a single JSON array is not supported. Mutually exclusive with 'records'."""
     )
     @PluginProperty(internalStorageURI = true, group = "main")
     private Property<String> from;
@@ -210,8 +215,8 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 .build()
         ) {
 
-            List<Map<String, Object>> chunk = new ArrayList<>();
-            int currentChunkBytes = 0;
+            var chunk = new ArrayList<Map<String, Object>>();
+            var currentChunkBytes = 0;
             TokenHolder tokenHolder = null;
 
             @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -236,8 +241,8 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                     }).readValues(parser);
                 }
 
-                int inlineIndex = 0;
-                int recordOrdinal = 0;
+                var inlineIndex = 0;
+                var recordOrdinal = 0;
                 while (true) {
                     Map<String, Object> record = null;
                     if (hasRecords) {
@@ -251,7 +256,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                         }
                     } else {
                         recordOrdinal++;
-                        boolean hasNext = false;
+                        var hasNext = false;
                         try {
                             hasNext = iterator.hasNextValue();
                         } catch (Exception e) {
@@ -329,13 +334,13 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         try {
             sendChunk(httpClient, url, tokenHolder.getToken(), chunk, catalog, schema, table, alreadyAccepted);
         } catch (HttpClientResponseException e) {
-            int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
+            var status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
             if (status == 401 && !tokenHolder.isPat()) {
                 refreshOAuthToken(tokenHolder, runContext, host, workspaceId, catalog, schema, table);
                 try {
                     sendChunk(httpClient, url, tokenHolder.getToken(), chunk, catalog, schema, table, alreadyAccepted);
                 } catch (HttpClientResponseException retryEx) {
-                    int retryStatus = retryEx.getResponse() != null ? retryEx.getResponse().getStatus().getCode() : 500;
+                    var retryStatus = retryEx.getResponse() != null ? retryEx.getResponse().getStatus().getCode() : 500;
                     if (retryStatus == 401) {
                         throw new IllegalStateException(
                             String.format(
@@ -374,7 +379,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private IllegalStateException mapSendChunkException(HttpClientResponseException e, String catalog, String schema,
         String table, AtomicLong alreadyAccepted) {
-        int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
+        var status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
         var body = readHttpErrorBody(e);
 
         if (status >= 400 && status < 500) {
@@ -536,7 +541,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
             long expiresIn = 3600;
             if (body.containsKey("expires_in")) {
-                Object exp = body.get("expires_in");
+                var exp = body.get("expires_in");
                 if (exp instanceof Number) {
                     expiresIn = ((Number) exp).longValue();
                 } else if (exp instanceof String) {
@@ -548,7 +553,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             }
 
             if (body.containsKey("access_token")) {
-                Object tokenObj = body.get("access_token");
+                var tokenObj = body.get("access_token");
                 if (tokenObj instanceof String) {
                     return new OAuthToken((String) tokenObj, expiresIn);
                 } else {
@@ -564,7 +569,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
                 );
             }
         } catch (HttpClientResponseException e) {
-            int status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
+            var status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
             var body = readHttpErrorBody(e);
             throw new IllegalStateException(String.format("Failed to obtain an OAuth token from %s (HTTP %d): %s. Check clientId and clientSecret.", tokenUrl, status, truncate(body)));
         }
@@ -582,7 +587,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
     private static String readHttpErrorBody(HttpClientResponseException e) {
         if (e.getResponse() != null && e.getResponse().getBody() != null) {
-            Object rawBody = e.getResponse().getBody();
+            var rawBody = e.getResponse().getBody();
             if (rawBody instanceof byte[]) {
                 return new String((byte[]) rawBody, StandardCharsets.UTF_8);
             } else {
@@ -593,7 +598,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     }
 
     private static String truncate(String body) {
-        // Truncate body to avoid overly large exception messages.
+
         if (body == null)
             return "";
         return body.length() > 500 ? body.substring(0, 500) + "..." : body;
@@ -602,7 +607,8 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     @Builder
     @Getter
     public static class Output implements io.kestra.core.models.tasks.Output {
-        @Schema(title = "Records count", description = "Total number of records successfully sent to Zerobus Ingest")
+        @Schema(title = "Records count", description = """
+            Total number of records successfully sent to Zerobus Ingest""")
         private final long recordsCount;
     }
 

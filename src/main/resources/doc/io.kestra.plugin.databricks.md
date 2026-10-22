@@ -64,4 +64,10 @@ Set `database` to the Postgres database name. `host` is optional: when it is omi
 
 ## Zerobus Ingest
 
-WriteRecords pushes records into a Unity Catalog Delta table through the Zerobus Ingest REST API; authentication with OAuth client credentials (host, authentication.clientId and clientSecret) plus workspaceId and either region or endpoint, a PAT is accepted but unverified against Zerobus; input is `records` (inline list of objects) or `from` (a file in internal storage, Ion or JSON lines, one record per line, a single JSON array is not supported); records are sent in chunks of up to 500 records or 4 MB; delivery is at-least-once so a retried task can write records twice.
+`zerobus.WriteRecords` pushes records into a Unity Catalog Delta table through the [Zerobus Ingest REST API](https://docs.databricks.com/aws/en/ingestion/zerobus-ingest).
+
+Authenticate with OAuth client credentials: set `host`, `authentication.clientId` and `authentication.clientSecret`, plus `workspaceId` and either `region` or `endpoint`. A PAT (`authentication.token`) is accepted but unverified against Zerobus.
+
+Provide the data with `records` (an inline list of objects) or `from` (a file in internal storage, Ion or JSON lines, one record per line; a single JSON array is not supported).
+
+Records are sent in chunks of up to 500 records or 4 MB. Delivery is at-least-once, so a retried task can write records twice.
