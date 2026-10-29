@@ -581,6 +581,7 @@ class WriteRecordsTest {
         assertThat(ex.getMessage(), containsString("Zerobus Ingest rejected the request (HTTP 403)"));
         assertThat(ex.getMessage(), containsString("Permission Denied"));
         assertThat(ex.getMessage(), containsString("Check that the table 'my_cat.my_schema.my_table' exists"));
+        assertThat(ex.getMessage(), containsString("Workspace access"));
         assertNoSecrets(ex);
         assertThat(ex.getMessage(), org.hamcrest.Matchers.not(containsString("qa_secret")));
     }
@@ -607,6 +608,17 @@ class WriteRecordsTest {
         String encodedDetails = tokenRequestBody.split("authorization_details=")[1].split("&")[0];
         String decodedDetails = java.net.URLDecoder.decode(encodedDetails, StandardCharsets.UTF_8);
         assertThat(decodedDetails, containsString("\"object_full_path\":\"my_cat.my_schema.my_table\""));
+
+        String expectedOp = "\"operations\":[\"zerobuswrite\"]";
+        int occurrences = (decodedDetails.length() - decodedDetails.replace(expectedOp, "").length()) / expectedOp.length();
+        assertThat(occurrences, is(1));
+
+        List<Map<String, Object>> entries = JacksonMapper.ofJson().readValue(decodedDetails, new TypeReference<>() {
+        });
+        assertThat(entries.get(0).containsKey("operations"), is(false));
+        assertThat(entries.get(1).containsKey("operations"), is(false));
+        assertThat(entries.get(2).get("operations"), is(List.of("zerobuswrite")));
+        assertThat(entries.get(2).get("object_type"), is("TABLE"));
     }
 
     @Test
@@ -707,14 +719,76 @@ class WriteRecordsTest {
 
     @Test
     void defaultUrlUsesWorkspaceAndRegion() {
-        String url = WriteRecords.buildIngestUrl(null, "ws123", "us-east-1", "cat", "sch", "tbl");
+        String url = WriteRecords.buildIngestUrl(null, null, "ws123", "us-east-1", "cat", "sch", "tbl");
         assertThat(url, is("https://ws123.zerobus.us-east-1.cloud.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
     }
 
     @Test
     void endpointOverridesRegion() {
-        String url = WriteRecords.buildIngestUrl("https://my-proxy.example.com", "ws123", "us-east-1", "cat", "sch", "tbl");
+        String url = WriteRecords.buildIngestUrl("https://my-proxy.example.com", null, "ws123", "us-east-1", "cat", "sch", "tbl");
         assertThat(url, is("https://my-proxy.example.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlWithAwsHostAndNullHostGivesCloudDomain() {
+        String awsUrl = WriteRecords.buildIngestUrl(null, "https://dbc-12345678-1234.cloud.databricks.com", "ws123", "us-east-1", "cat", "sch", "tbl");
+        assertThat(awsUrl, is("https://ws123.zerobus.us-east-1.cloud.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+
+        String nullHostUrl = WriteRecords.buildIngestUrl(null, null, "ws123", "us-east-1", "cat", "sch", "tbl");
+        assertThat(nullHostUrl, is("https://ws123.zerobus.us-east-1.cloud.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlWithAzureHostGivesAzureDomain() {
+        String url = WriteRecords.buildIngestUrl(null, "https://adb-1234567890.12.azuredatabricks.net", "WS", "eastus", "cat", "sch", "tbl");
+        assertThat(url, is("https://WS.zerobus.eastus.azuredatabricks.net/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlWithGcpHostGivesGcpDomain() {
+        String url = WriteRecords.buildIngestUrl(null, "https://1234567890.1.gcp.databricks.com", "WS", "us-east1", "cat", "sch", "tbl");
+        assertThat(url, is("https://WS.zerobus.us-east1.gcp.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlHostWithoutSchemeAndWithTrailingSlash() {
+        String noSchemeUrl = WriteRecords.buildIngestUrl(null, "adb-1234567890.12.azuredatabricks.net", "WS", "eastus", "cat", "sch", "tbl");
+        assertThat(noSchemeUrl, is("https://WS.zerobus.eastus.azuredatabricks.net/zerobus/v1/tables/cat.sch.tbl/insert"));
+
+        String trailingSlashUrl = WriteRecords.buildIngestUrl(null, "https://adb-1234567890.12.azuredatabricks.net/", "WS", "eastus", "cat", "sch", "tbl");
+        assertThat(trailingSlashUrl, is("https://WS.zerobus.eastus.azuredatabricks.net/zerobus/v1/tables/cat.sch.tbl/insert"));
+
+        String gcpNoSchemeUrl = WriteRecords.buildIngestUrl(null, "1234567890.1.gcp.databricks.com/", "WS", "us-east1", "cat", "sch", "tbl");
+        assertThat(gcpNoSchemeUrl, is("https://WS.zerobus.us-east1.gcp.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlGarbageHostFallsBackToAwsDomain() {
+        String url = WriteRecords.buildIngestUrl(null, "invalid :// garbage host @@", "WS", "us-east-1", "cat", "sch", "tbl");
+        assertThat(url, is("https://WS.zerobus.us-east-1.cloud.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+
+        String blankUrl = WriteRecords.buildIngestUrl(null, "   ", "WS", "us-east-1", "cat", "sch", "tbl");
+        assertThat(blankUrl, is("https://WS.zerobus.us-east-1.cloud.databricks.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void buildIngestUrlEndpointOverrideWinsEvenWithAzureHost() {
+        String url = WriteRecords.buildIngestUrl("https://custom-proxy.example.com/", "https://adb-1234567890.12.azuredatabricks.net", "WS", "eastus", "cat", "sch", "tbl");
+        assertThat(url, is("https://custom-proxy.example.com/zerobus/v1/tables/cat.sch.tbl/insert"));
+    }
+
+    @Test
+    void zerobusDomainResolvesCorrectly() {
+        assertThat(WriteRecords.zerobusDomain(null), is("cloud.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain(""), is("cloud.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain("   "), is("cloud.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain("https://adb-1234567890.12.azuredatabricks.net"), is("azuredatabricks.net"));
+        assertThat(WriteRecords.zerobusDomain("adb-1234567890.12.azuredatabricks.net"), is("azuredatabricks.net"));
+        assertThat(WriteRecords.zerobusDomain("https://adb-1234567890.12.azuredatabricks.net/"), is("azuredatabricks.net"));
+        assertThat(WriteRecords.zerobusDomain("https://1234567890.1.gcp.databricks.com"), is("gcp.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain("1234567890.1.gcp.databricks.com/"), is("gcp.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain("https://dbc-123.cloud.databricks.com"), is("cloud.databricks.com"));
+        assertThat(WriteRecords.zerobusDomain("garbage host :/// @#$"), is("cloud.databricks.com"));
     }
 
     @Test
@@ -746,6 +820,19 @@ class WriteRecordsTest {
         assertThat(decoded, containsString("USE SCHEMA"));
         assertThat(decoded, containsString("SELECT"));
         assertThat(decoded, containsString("MODIFY"));
+
+        String encodedDetails = tokenRequestBody.split("authorization_details=")[1].split("&")[0];
+        String decodedDetails = java.net.URLDecoder.decode(encodedDetails, StandardCharsets.UTF_8);
+        String expectedOp = "\"operations\":[\"zerobuswrite\"]";
+        int occurrences = (decodedDetails.length() - decodedDetails.replace(expectedOp, "").length()) / expectedOp.length();
+        assertThat(occurrences, is(1));
+
+        List<Map<String, Object>> entries = JacksonMapper.ofJson().readValue(decodedDetails, new TypeReference<>() {
+        });
+        assertThat(entries.get(0).containsKey("operations"), is(false));
+        assertThat(entries.get(1).containsKey("operations"), is(false));
+        assertThat(entries.get(2).get("operations"), is(List.of("zerobuswrite")));
+        assertThat(entries.get(2).get("object_type"), is("TABLE"));
     }
 
     @Test

@@ -97,22 +97,25 @@ import lombok.experimental.SuperBuilder;
         @Metric(name = "records.count", type = "counter", description = "Number of records pushed to Zerobus Ingest")
     }
 )
-@Schema(title = "Push data directly into a Unity Catalog Delta table via Zerobus Ingest", description = """
-    This task sends data to a Databricks Delta table via the push-based Zerobus Ingest REST API.
+@Schema(
+    title = "Push data directly into a Unity Catalog Delta table via Zerobus Ingest",
+    description = """
+        This task sends data to a Databricks Delta table via the push-based Zerobus Ingest REST API.
 
-    It supports at-least-once delivery. If a task is retried after a partial failure, records that were already
-    successfully accepted in previous chunks will be sent again and may be duplicated in the target table.
-    Kestra's HTTP client may retry a failed request once on a server error, so with at-least-once delivery a chunk can be written twice.
+        It supports at-least-once delivery. If a task is retried after a partial failure, records that were already
+        successfully accepted in previous chunks will be sent again and may be duplicated in the target table.
+        Kestra's HTTP client may retry a failed request once on a server error, so with at-least-once delivery a chunk can be written twice.
 
-    The task authenticates using either OAuth client credentials or a Personal Access Token (PAT).
-    An OAuth token is refreshed shortly before it expires, and a 401 on the ingest call triggers one refresh and one retry of that chunk. A PAT is never refreshed or retried.
-    **Note**: PAT authentication is documented as unverified against Zerobus Ingest; use OAuth client credentials if possible.
-    The `host` property is required when using OAuth authentication.
+        The task authenticates using either OAuth client credentials or a Personal Access Token (PAT).
+        An OAuth token is refreshed shortly before it expires, and a 401 on the ingest call triggers one refresh and one retry of that chunk. A PAT is never refreshed or retried.
+        **Note**: Databricks documents short-lived OAuth tokens from a service principal as the only authentication for Zerobus Ingest. A PAT is sent as a Bearer token but has not been verified against Zerobus; prefer OAuth client credentials.
+        The `host` property is required when using OAuth authentication. The default endpoint domain follows host: azuredatabricks.net for Azure, gcp.databricks.com for GCP, cloud.databricks.com otherwise.
 
-    Records are sent in chunks, bounded by conservative assumptions since the API docs do not specify a per-request limit.
+        Records are sent in chunks, bounded by conservative assumptions since the API docs do not specify a per-request limit.
 
-    **Note**: The inherited properties `configFile` and `accountId` are ignored by this task, and `AbstractTask` environment variable fallbacks are not honoured.
-    """)
+        **Note**: The inherited properties `configFile` and `accountId` are ignored by this task, and `AbstractTask` environment variable fallbacks are not honoured.
+        """
+)
 public class WriteRecords extends AbstractTask implements RunnableTask<WriteRecords.Output> {
     private static final String UNSUPPORTED_AUTH_MSG = "Zerobus Ingest REST requires either a personal access token (authentication.token) or OAuth client credentials (authentication.clientId + authentication.clientSecret). Other authentication types are not supported.";
 
@@ -140,13 +143,16 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     @PluginProperty(group = "connection")
     private Property<String> workspaceId;
 
-    @Schema(title = "Cloud region", description = """
-        Region (e.g. us-east-1). Ignored when 'endpoint' is set. Required when 'endpoint' is not set.""")
+    @Schema(
+        title = "Cloud region",
+        description = """
+            Cloud region used to build the default Zerobus endpoint, for example us-west-2 on AWS, eastus on Azure or us-east1 on GCP. Ignored when 'endpoint' is set. Required when 'endpoint' is not set."""
+    )
     @PluginProperty(group = "connection")
     private Property<String> region;
 
     @Schema(title = "Zerobus endpoint URL override", description = """
-        Replaces the auto-computed URL (e.g. https://my-proxy).""")
+        Replaces the computed Zerobus URL (https://<workspaceId>.zerobus.<region>.<cloud domain>). Use it for private connectivity, a proxy or tests.""")
     @PluginProperty(group = "connection")
     private Property<String> endpoint;
 
@@ -203,7 +209,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         }
 
         var ingestUrl = buildIngestUrl(
-            rEndpoint, rWorkspaceId, rRegion, rCatalog,
+            rEndpoint, rHost, rWorkspaceId, rRegion, rCatalog,
             rSchema, rTable
         );
 
@@ -384,7 +390,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
         if (status >= 400 && status < 500) {
             var advice = (status == 403 || status == 404) ? String.format(
-                " Check that the table '%s.%s.%s' exists, the schema matches, and the service principal has USE CATALOG, USE SCHEMA, SELECT, and MODIFY privileges.",
+                " Check that the table '%s.%s.%s' exists and that the service principal needs the Workspace access entitlement, USE CATALOG and USE SCHEMA (or ALL PRIVILEGES on the catalog or schema) and SELECT and MODIFY (or ALL PRIVILEGES) on the table.",
                 catalog, schema, table
             ) : "";
             return new IllegalStateException(
@@ -477,7 +483,13 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         var authDetails = List.of(
             Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE CATALOG"), "object_type", "CATALOG", "object_full_path", catalog),
             Map.of("type", "unity_catalog_privileges", "privileges", List.of("USE SCHEMA"), "object_type", "SCHEMA", "object_full_path", catalog + "." + schema),
-            Map.of("type", "unity_catalog_privileges", "privileges", List.of("SELECT", "MODIFY"), "object_type", "TABLE", "object_full_path", catalog + "." + schema + "." + table)
+            Map.of(
+                "type", "unity_catalog_privileges",
+                "privileges", List.of("SELECT", "MODIFY"),
+                "object_type", "TABLE",
+                "object_full_path", catalog + "." + schema + "." + table,
+                "operations", List.of("zerobuswrite")
+            )
         );
 
         var authDetailsJson = JacksonMapper.ofJson().writeValueAsString(authDetails);
@@ -575,9 +587,34 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         }
     }
 
-    static String buildIngestUrl(String endpoint, String workspaceId, String region, String catalog, String schema, String table) {
+    static String zerobusDomain(String host) {
+        if (host == null || host.isBlank()) {
+            return "cloud.databricks.com";
+        }
+        try {
+            var trimmed = host.trim();
+            var hostToParse = trimmed.contains("://") ? trimmed : "https://" + trimmed;
+            var uri = URI.create(hostToParse);
+            var hostname = uri.getHost();
+            if (hostname == null) {
+                return "cloud.databricks.com";
+            }
+            var lower = hostname.toLowerCase(java.util.Locale.ROOT);
+            if (lower.endsWith("azuredatabricks.net")) {
+                return "azuredatabricks.net";
+            }
+            if (lower.endsWith("gcp.databricks.com")) {
+                return "gcp.databricks.com";
+            }
+            return "cloud.databricks.com";
+        } catch (Exception e) {
+            return "cloud.databricks.com";
+        }
+    }
+
+    static String buildIngestUrl(String endpoint, String host, String workspaceId, String region, String catalog, String schema, String table) {
         var base = endpoint != null ? (endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint)
-            : "https://" + workspaceId + ".zerobus." + region + ".cloud.databricks.com";
+            : "https://" + workspaceId + ".zerobus." + region + "." + zerobusDomain(host);
         return base + "/zerobus/v1/tables/" + encode(catalog) + "." + encode(schema) + "." + encode(table) + "/insert";
     }
 
