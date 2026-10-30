@@ -66,7 +66,7 @@ Set `database` to the Postgres database name. `host` is optional: when it is omi
 
 `zerobus.WriteRecords` pushes records into a Unity Catalog Delta table through the [Zerobus Ingest REST API](https://docs.databricks.com/aws/en/ingestion/zerobus-ingest).
 
-Authenticate with OAuth client credentials: set `host`, `authentication.clientId` and `authentication.clientSecret`, plus `workspaceId` and either `region` or `endpoint`. The default endpoint domain follows `host`: `cloud.databricks.com` for AWS (for example `us-west-2`), `azuredatabricks.net` for Azure (for example `eastus`), and `gcp.databricks.com` for GCP (for example `us-east1`). A PAT (`authentication.token`) is accepted but unverified against Zerobus. Databricks documents short-lived OAuth tokens from a service principal as the only authentication for Zerobus Ingest. A PAT is sent as a Bearer token but has not been verified against Zerobus; prefer OAuth client credentials.
+Authenticate with OAuth client credentials: set `host`, `authentication.clientId` and `authentication.clientSecret`, plus `workspaceId` and either `region` or `endpoint`. The default endpoint domain follows `host`: `cloud.databricks.com` for AWS (for example `us-west-2`), `azuredatabricks.net` for Azure (for example `eastus`), and `gcp.databricks.com` for GCP (for example `us-east1`). Databricks documents short-lived OAuth tokens from a service principal as the only authentication for Zerobus Ingest. A PAT (`authentication.token`) is sent as a Bearer token but is unverified; prefer OAuth client credentials.
 
 Provide the data with `records` (an inline list of objects) or `from` (a file in internal storage, Ion or JSON lines, one record per line; a single JSON array is not supported).
 

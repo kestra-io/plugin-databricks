@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -390,7 +391,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
 
         if (status >= 400 && status < 500) {
             var advice = (status == 403 || status == 404) ? String.format(
-                " Check that the table '%s.%s.%s' exists and that the service principal needs the Workspace access entitlement, USE CATALOG and USE SCHEMA (or ALL PRIVILEGES on the catalog or schema) and SELECT and MODIFY (or ALL PRIVILEGES) on the table.",
+                " Check that the table '%s.%s.%s' exists and that the service principal has the Workspace access entitlement, USE CATALOG and USE SCHEMA (or ALL PRIVILEGES on the catalog or schema), and SELECT and MODIFY (or ALL PRIVILEGES) on the table.",
                 catalog, schema, table
             ) : "";
             return new IllegalStateException(
@@ -599,7 +600,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
             if (hostname == null) {
                 return "cloud.databricks.com";
             }
-            var lower = hostname.toLowerCase(java.util.Locale.ROOT);
+            var lower = hostname.toLowerCase(Locale.ROOT);
             if (lower.endsWith("azuredatabricks.net")) {
                 return "azuredatabricks.net";
             }
