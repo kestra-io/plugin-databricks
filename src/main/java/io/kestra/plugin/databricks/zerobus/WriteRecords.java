@@ -110,7 +110,7 @@ import lombok.experimental.SuperBuilder;
         The task authenticates using either OAuth client credentials or a Personal Access Token (PAT).
         An OAuth token is refreshed shortly before it expires, and a 401 on the ingest call triggers one refresh and one retry of that chunk. A PAT is never refreshed or retried.
         **Note**: Databricks documents short-lived OAuth tokens from a service principal as the only authentication for Zerobus Ingest. A PAT is sent as a Bearer token but has not been verified against Zerobus; prefer OAuth client credentials.
-        The `host` property is required when using OAuth authentication. The default endpoint domain follows host: azuredatabricks.net for Azure, gcp.databricks.com for GCP, cloud.databricks.com otherwise.
+        The `host` property is required when using OAuth authentication. The default endpoint domain follows host: `azuredatabricks.net` for Azure, `gcp.databricks.com` for GCP, `cloud.databricks.com` otherwise.
 
         Records are sent in chunks, bounded by conservative assumptions since the API docs do not specify a per-request limit.
 
@@ -153,7 +153,7 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
     private Property<String> region;
 
     @Schema(title = "Zerobus endpoint URL override", description = """
-        Replaces the computed Zerobus URL (https://<workspaceId>.zerobus.<region>.<cloud domain>). Use it for private connectivity, a proxy or tests.""")
+        Replaces the computed Zerobus URL (`https://<workspaceId>.zerobus.<region>.<cloud domain>`). Use it for private connectivity, a proxy or tests.""")
     @PluginProperty(group = "connection")
     private Property<String> endpoint;
 
@@ -584,7 +584,10 @@ public class WriteRecords extends AbstractTask implements RunnableTask<WriteReco
         } catch (HttpClientResponseException e) {
             var status = e.getResponse() != null ? e.getResponse().getStatus().getCode() : 500;
             var body = readHttpErrorBody(e);
-            throw new IllegalStateException(String.format("Failed to obtain an OAuth token from %s (HTTP %d): %s. Check clientId and clientSecret.", tokenUrl, status, truncate(body)));
+            var advice = status == 403
+                ? String.format("Check that the service principal has the Workspace access entitlement USE CATALOG and USE SCHEMA, and SELECT and MODIFY (or ALL PRIVILEGES) on the table '%s.%s.%s'.", catalog, schema, table)
+                : "Check clientId and clientSecret.";
+            throw new IllegalStateException(String.format("Failed to obtain an OAuth token from %s (HTTP %d): %s. %s", tokenUrl, status, truncate(body), advice));
         }
     }
 

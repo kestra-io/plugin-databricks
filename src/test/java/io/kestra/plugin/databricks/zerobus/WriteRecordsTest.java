@@ -55,6 +55,7 @@ class WriteRecordsTest {
     private String tokenRequestBody = null;
     private String tokenRequestAuth = null;
     private Boolean returnEmptyTokenResponse = false;
+    private int tokenStatus = 200;
     private List<byte[]> mockServerRequestBodies = new ArrayList<>();
 
     @BeforeEach
@@ -69,6 +70,7 @@ class WriteRecordsTest {
         tokenRequestBody = null;
         tokenRequestAuth = null;
         returnEmptyTokenResponse = false;
+        tokenStatus = 200;
         mockServerRequestBodies = new ArrayList<>();
 
         server = HttpServer.create(new InetSocketAddress(0), 0);
@@ -105,6 +107,13 @@ class WriteRecordsTest {
             try {
                 tokenRequestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 tokenRequestAuth = exchange.getRequestHeaders().getFirst("Authorization");
+                if (tokenStatus != 200) {
+                    byte[] response = "{\"error\":\"access_denied\"}".getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(tokenStatus, response.length);
+                    exchange.getResponseBody().write(response);
+                    exchange.close();
+                    return;
+                }
                 if (returnStatus != 200 && returnStatus != 403 && returnStatus != 404 && returnStatus != 500) {
                     // special error simulation for token if needed
                     byte[] response = returnBody.getBytes(StandardCharsets.UTF_8);
@@ -684,6 +693,36 @@ class WriteRecordsTest {
         Exception e = assertThrows(Exception.class, () -> task.run(runContext));
         assertThat(e.getMessage(), containsString("access_token missing in response"));
         assertThat(e.getMessage(), org.hamcrest.Matchers.not(containsString("secret")));
+    }
+
+    @Test
+    void oauthToken401AdvisesCredentials() {
+        tokenStatus = 401;
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, baseBuilder().build(), Map.of());
+        WriteRecords task = baseBuilder()
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        Exception e = assertThrows(Exception.class, () -> task.run(runContext));
+        assertThat(e.getMessage(), containsString("(HTTP 401)"));
+        assertThat(e.getMessage(), containsString("Check clientId and clientSecret."));
+        assertThat(chunkCount.get(), is(0));
+    }
+
+    @Test
+    void oauthToken403AdvisesPrivileges() {
+        tokenStatus = 403;
+        RunContext runContext = TestsUtils.mockRunContext(runContextFactory, baseBuilder().build(), Map.of());
+        WriteRecords task = baseBuilder()
+            .records(Property.of(List.of(Map.of("id", 1))))
+            .build();
+
+        Exception e = assertThrows(Exception.class, () -> task.run(runContext));
+        assertThat(e.getMessage(), containsString("(HTTP 403)"));
+        assertThat(e.getMessage(), containsString("Workspace access entitlement"));
+        assertThat(e.getMessage(), containsString("'my_cat.my_schema.my_table'"));
+        assertThat(e.getMessage(), org.hamcrest.Matchers.not(containsString("Check clientId and clientSecret.")));
+        assertThat(chunkCount.get(), is(0));
     }
 
     @Test
