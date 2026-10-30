@@ -36,6 +36,7 @@ Single-module plugin. Source packages under `io.kestra.plugin`:
 - `io.kestra.plugin.databricks.lakebase.Query`
 - `io.kestra.plugin.databricks.lakebase.Batch`
 - `io.kestra.plugin.databricks.lakebase.Trigger`
+- `io.kestra.plugin.databricks.zerobus.WriteRecords`
 
 ### Project Structure
 

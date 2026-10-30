@@ -61,3 +61,14 @@ Each run calls `WorkspaceClient.postgres().generateDatabaseCredential` and opens
 Set `database` to the Postgres database name. `host` is optional: when it is omitted, the Postgres hostname is resolved from the endpoint (`status.hosts.host`). `port` defaults to `5432`. The service principal needs Workspace access and a matching Postgres OAuth role.
 
 `lakebase.Query` runs one statement. `fetchType` is `FETCH` (default), `FETCH_ONE`, `STORE`, or `NONE`. `lakebase.Batch` runs a prepared statement once per row from `parameterGroups` or from an Ion file (`from`). `lakebase.Trigger` polls on `interval` (default `PT1M`) and fires when the query returns at least one row.
+
+## Zerobus Ingest
+
+`zerobus.WriteRecords` pushes records into a Unity Catalog Delta table through the [Zerobus Ingest REST API](https://docs.databricks.com/aws/en/ingestion/zerobus-ingest).
+
+Authenticate with OAuth client credentials: set `host`, `authentication.clientId` and `authentication.clientSecret`, plus `workspaceId` and either `region` or `endpoint`. The default endpoint domain follows `host`: `cloud.databricks.com` for AWS (for example `us-west-2`), `azuredatabricks.net` for Azure (for example `eastus`), and `gcp.databricks.com` for GCP (for example `us-east1`). Databricks documents short-lived OAuth tokens from a service principal as the only authentication for Zerobus Ingest. A PAT (`authentication.token`) is sent as a Bearer token but is unverified; prefer OAuth client credentials.
+
+Provide the data with `records` (an inline list of objects) or `from` (a file in internal storage, Ion or JSON lines, one record per line; a single JSON array is not supported).
+
+Records are sent in chunks of up to 500 records or 4 MB. Delivery is at-least-once, so a retried task can write records twice.
+
