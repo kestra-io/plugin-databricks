@@ -37,6 +37,17 @@ tasks.withType(JavaCompile) {
     options.compilerArgs.add("-parameters")
 }
 
+// Security pin: jackson-databind and jackson-core below 2.21.7 are vulnerable.
+// Remove once the Kestra platform BOM bumps Jackson to 2.21.7 or later.
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == "com.fasterxml.jackson.core"
+            && (details.requested.name == "jackson-databind" || details.requested.name == "jackson-core")) {
+            details.useVersion "2.21.7"
+        }
+    }
+}
+
 dependencies {
     // Platform
     annotationProcessor enforcedPlatform("io.kestra:platform:$kestraVersion")
