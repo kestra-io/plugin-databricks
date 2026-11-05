@@ -40,6 +40,8 @@ tasks.withType(JavaCompile) {
 // Security pin: jackson-databind and jackson-core below 2.21.7 are vulnerable.
 // Remove once the Kestra platform BOM bumps Jackson to 2.21.7 or later.
 configurations.configureEach {
+    // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
+    resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
     resolutionStrategy.eachDependency { details ->
         if (details.requested.group == "com.fasterxml.jackson.core"
             && (details.requested.name == "jackson-databind" || details.requested.name == "jackson-core")) {
