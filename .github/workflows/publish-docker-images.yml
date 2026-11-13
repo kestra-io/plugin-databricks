@@ -2,7 +2,7 @@ name: Publish docker images
 description: automatically build and publishes the docker images provided by Kestra in directory dockerfiles
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 on:
   push:
     paths:
@@ -23,8 +23,10 @@ jobs:
       dockerfiles_changed: ${{ steps.filter.outputs.dockerfiles }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           list-files: json
@@ -49,17 +51,19 @@ jobs:
         image: ${{ fromJson(needs.changes.outputs.dockerfiles) }}
     steps:
       - name: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: GHCR Login
         if: github.event_name == 'push'
-        uses: docker/login-action@v4
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -76,7 +80,7 @@ jobs:
 
       - name: Build Docker image (pull request)
         if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
@@ -89,11 +93,14 @@ jobs:
         if: github.event_name == 'pull_request' && steps.image-tag.outputs.image == 'databricks-sql-cli'
         env:
           IMAGE_URL: ${{ steps.image-tag.outputs.image_url }}
-        run: docker run --rm "$IMAGE_URL" dbsqlcli --help
+        # --help alone doesn't load pyarrow: also exercise the query path (connector, pyarrow -> pandas)
+        run: |
+          docker run --rm "$IMAGE_URL" dbsqlcli --help
+          docker run --rm "$IMAGE_URL" python -c "import databricks.sql.client, pyarrow as pa; print(pa.table({'a': [1]}).to_pandas())"
 
       - name: Build and push Docker image
         if: github.event_name == 'push'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: true
