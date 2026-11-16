@@ -42,6 +42,8 @@ tasks.withType(JavaCompile) {
 configurations.configureEach {
     // SEC-0369: platform BOM pins guava 33.4.8-jre, remove once it ships >= 33.7.2.
     resolutionStrategy.force "com.google.guava:guava:33.7.2-jre"
+    // SEC-0207: platform BOM pins org.postgresql:postgresql 42.7.10, remove once it ships >= 42.7.12.
+    resolutionStrategy.force "org.postgresql:postgresql:42.7.14"
     resolutionStrategy.eachDependency { details ->
         if (details.requested.group == "com.fasterxml.jackson.core"
             && (details.requested.name == "jackson-databind" || details.requested.name == "jackson-core")) {
