@@ -67,7 +67,7 @@ dependencies {
     compileOnly group: "io.kestra", name: "script", version: kestraVersion
 
     // Databricks deps
-    api "com.databricks:databricks-sdk-java:0.177.0"
+    api "com.databricks:databricks-sdk-java:0.178.0"
     api "com.databricks:databricks-jdbc:3.4.5"
 
     // Lakebase speaks the standard Postgres wire protocol (version managed by the Kestra platform)
