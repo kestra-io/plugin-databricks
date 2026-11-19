@@ -82,6 +82,17 @@ import io.kestra.core.models.annotations.PluginProperty;
 public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>, NamespaceFilesInterface, InputFilesInterface, OutputFilesInterface {
 
     public static final String DEFAULT_IMAGE = "ghcr.io/kestra-io/databricks-sql-cli";
+    static final String ENTRYPOINT_SCRIPT = "/usr/local/bin/kestra-entrypoint.sh";
+    // The default image starts as root and its entrypoint script hands the working directory to an unprivileged user.
+    // Kestra's Docker runner clears the image entrypoint by default, so it is set explicitly. Images published before
+    // the non-root change do not ship the script (and may be cached), so fall back to running the command directly.
+    // The runner passes the task command as Cmd, which reaches the wrapper as "$@"; the last item is $0.
+    static final List<String> DEFAULT_IMAGE_ENTRYPOINT = List.of(
+        "/bin/sh",
+        "-c",
+        "if [ -x " + ENTRYPOINT_SCRIPT + " ]; then exec " + ENTRYPOINT_SCRIPT + " \"$@\"; else exec \"$@\"; fi",
+        "kestra-entrypoint"
+    );
 
     @Schema(
         title = "Databricks host",
@@ -166,7 +177,12 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
 
         List<String> databricksCommand = getDatabricksCommand(runContext);
 
-        return new CommandsWrapper(runContext)
+        return commands(runContext, databricksCommand, token, renderedOutputFiles).run();
+    }
+
+    CommandsWrapper commands(RunContext runContext, List<String> databricksCommand, String token, List<String> renderedOutputFiles)
+        throws Exception {
+        var wrapper = new CommandsWrapper(runContext)
             .withTaskRunner(this.taskRunner)
             .withDockerOptions(injectDefaults(this.getDocker()))
             .withContainerImage(runContext.render(this.containerImage).as(String.class).orElseThrow())
@@ -175,8 +191,37 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
             .withEnv(Map.of("DATABRICKS_TOKEN", token))
             .withNamespaceFiles(namespaceFiles)
             .withInputFiles(inputFiles)
-            .withOutputFiles(renderedOutputFiles.isEmpty() ? null : renderedOutputFiles)
-            .run();
+            .withOutputFiles(renderedOutputFiles.isEmpty() ? null : renderedOutputFiles);
+
+        return applyEntrypoint(wrapper);
+    }
+
+    /**
+     * Sets the non-root entrypoint on the Docker task runner when it runs the default image. Applied on the wrapper
+     * rather than only in {@code injectDefaults}, which Kestra only honors for the deprecated {@code docker} property on
+     * 1.3.x and never on 2.x. Custom images, other runners and user-defined entrypoints are left untouched.
+     */
+    static CommandsWrapper applyEntrypoint(CommandsWrapper commands) {
+        TaskRunner<?> runner = commands.getTaskRunner();
+        if (!(runner instanceof Docker docker)) {
+            return commands;
+        }
+
+        // The Docker runner's own image wins over the task containerImage at runtime, so check it first.
+        var image = docker.getImage() != null ? docker.getImage() : commands.getContainerImage();
+        if (!isDefaultImage(image) || !hasDefaultEntryPoint(docker.getEntryPoint())) {
+            return commands;
+        }
+
+        return commands.withTaskRunner(docker.toBuilder().entryPoint(DEFAULT_IMAGE_ENTRYPOINT).build());
+    }
+
+    private static boolean hasDefaultEntryPoint(List<String> entryPoint) {
+        return entryPoint == null || entryPoint.isEmpty() || entryPoint.equals(List.of(""));
+    }
+
+    static boolean isDefaultImage(String image) {
+        return image != null && (image.equals(DEFAULT_IMAGE) || image.startsWith(DEFAULT_IMAGE + ":") || image.startsWith(DEFAULT_IMAGE + "@"));
     }
 
     List<String> getDatabricksCommand(RunContext runContext) throws IllegalVariableEvaluationException {
@@ -217,8 +262,13 @@ public class DatabricksSQLCLI extends Task implements RunnableTask<ScriptOutput>
         }
 
         var builder = original.toBuilder();
-        if (original.getImage() == null) {
-            builder.image(DEFAULT_IMAGE);
+        var image = original.getImage();
+        if (image == null) {
+            image = DEFAULT_IMAGE;
+            builder.image(image);
+        }
+        if (isDefaultImage(image) && (original.getEntryPoint() == null || original.getEntryPoint().isEmpty())) {
+            builder.entryPoint(DEFAULT_IMAGE_ENTRYPOINT);
         }
 
         return builder.build();
