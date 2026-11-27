@@ -10,15 +10,25 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 # databricks-sql-cli pins pandas 1.3.4, which builds from source on 3.11 and needs pkg_resources (dropped in newer setuptools)
 # pyarrow 26+ requires numpy 2, while the CLI pins numpy 1.23.4 (pyarrow doesn't declare numpy, so pip check can't see it)
 RUN echo "setuptools<81" > /tmp/build-constraints.txt && PIP_CONSTRAINT=/tmp/build-constraints.txt PIP_BUILD_CONSTRAINT=/tmp/build-constraints.txt pip install --no-cache-dir databricks-sql-cli "pyarrow<26"
-# thrift <0.17, oauthlib <4 and sqlparse <0.5 are pinned by databricks-sql-cli / databricks-sql-connector 2.5.2 and can't
-# move; the other packages already resolve to their latest fixed versions.
-RUN pip check
+# databricks-sql-cli / databricks-sql-connector 2.5.2 pin sqlparse <0.5, thrift <0.17 and oauthlib <4 (all with known CVEs, and
+# upstream is unmaintained), so override the three pins after the CLI install. The CLI and the connector only use stable APIs of
+# these packages; the smoke tests of the publish workflow exercise them. Revert an override if it breaks the CLI.
+RUN pip install --no-cache-dir "sqlparse>=0.6.0" "thrift>=0.24.0" "oauthlib>=4.0.1"
+# pip check now reports exactly the three overridden pins above: tolerate those conflicts and still fail on any other one.
+RUN ! pip check | grep -v -E "^No broken requirements found\.$" | grep -v -E " has requirement (sqlparse|thrift|oauthlib)[^,]*(,[^,]*)*, but you have (sqlparse|thrift|oauthlib) "
 
 FROM python:3.11-slim-trixie
 LABEL org.opencontainers.image.source=https://github.com/kestra-io/plugin-databricks
 LABEL org.opencontainers.image.description="Image with the latest databricks-sql-cli package"
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local /usr/local
+# setuptools (and the wheel / jaraco.context it vendors) is only needed to build pandas (build stage). The python base image also ships
+# its own copy, plus the wheels bundled in ensurepip: remove them all from the final image. Nothing in the CLI imports pkg_resources at runtime.
+# (rm rather than pip uninstall: COPY overlays the build stage's site-packages on the base image's, so the dist-info can be mixed)
+RUN SP=/usr/local/lib/python3.11/site-packages \
+    && rm -rf "$SP"/setuptools "$SP"/setuptools-*.dist-info "$SP"/pkg_resources "$SP"/_distutils_hack "$SP"/distutils-precedence.pth \
+        "$SP"/wheel "$SP"/wheel-*.dist-info /usr/local/bin/wheel \
+        /usr/local/lib/python3.11/ensurepip/_bundled/setuptools-*.whl /usr/local/lib/python3.11/ensurepip/_bundled/wheel-*.whl
 # Unprivileged user (fixed UID/GID 1000) with a writable HOME. The container itself starts as root
 # and databricks-sql-cli-entrypoint.sh drops to this user: Kestra creates the task working directory as root.
 RUN groupadd --gid 1000 kestra \

@@ -93,10 +93,28 @@ jobs:
         if: github.event_name == 'pull_request' && steps.image-tag.outputs.image == 'databricks-sql-cli'
         env:
           IMAGE_URL: ${{ steps.image-tag.outputs.image_url }}
-        # --help alone doesn't load pyarrow: also exercise the query path (connector, pyarrow -> pandas)
+        # --help alone doesn't load pyarrow: also exercise the query path (connector, pyarrow -> pandas), plus the overridden
+        # sqlparse / thrift / oauthlib (the CLI and connector pin older versions) and the removal of setuptools
         run: |
           docker run --rm "$IMAGE_URL" dbsqlcli --help
           docker run --rm "$IMAGE_URL" python -c "import databricks.sql.client, pyarrow as pa; print(pa.table({'a': [1]}).to_pandas())"
+          docker run --rm "$IMAGE_URL" python -c "
+          import sqlparse
+          from thrift.protocol import TBinaryProtocol as P
+          from thrift.TSerialization import serialize, deserialize
+          from databricks.sql.thrift_api.TCLIService import ttypes
+          from databricks.sql.thrift_backend import ThriftBackend
+          from oauthlib.oauth2 import WebApplicationClient
+          from dbsqlcli.completer import DBSQLCompleter
+          from dbsqlcli.packages import parseutils
+          f = P.TBinaryProtocolFactory()
+          r = ttypes.TOpenSessionReq(client_protocol=ttypes.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
+          assert deserialize(ttypes.TOpenSessionReq(), serialize(r, f), f) == r
+          assert 'client_id=x' in WebApplicationClient('x').prepare_request_uri('https://e.x/auth')
+          assert sqlparse.split('select 1; select 2;') == ['select 1;', 'select 2;']
+          assert list(parseutils.extract_tables('select * from a.b')) == [('a', 'b', None)]
+          "
+          if docker run --rm "$IMAGE_URL" python -c "import setuptools" 2>/dev/null; then echo "setuptools must not ship in the image"; exit 1; fi
 
       - name: Build and push Docker image
         if: github.event_name == 'push'
